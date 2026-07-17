@@ -1,0 +1,57 @@
+ontext:  
+We are designing recommendation widgets for the e-commerce platform ShopNow. The focus domain should be Electronics (Mobile, Laptop, Accessories, etc.). The system must personalize recommendations for a known user persona (Rahul, 32 years old) while also handling anonymous users gracefully.
+
+Requirements:
+
+Recommendation Types:
+
+Content-Based Filtering: Use product attributes (e.g., category, specs, color, brand) to recommend similar electronics.
+
+Collaborative Filtering: Show items trending among similar shoppers, but avoid popularity bias.
+
+Hybrid Filtering: Combine personalization with editorial curation to balance relevance and discovery.
+
+AI/ML Design Considerations:
+
+Implement color filtering (e.g., recommending accessories matching device colors).
+
+Use editorial filtering to highlight curated collections (e.g., “Top Laptops for Students”).
+
+Avoid cold start problems by using editorial loops and fallback strategies (e.g., trending electronics when user history is sparse).
+
+Explicitly mitigate popularity bias so niche but relevant products still surface.
+
+User Persona (Rahul, 32):
+
+Recently purchased Nike Running Shoes (sports domain).
+
+For electronics, assume Rahul is browsing laptops and mobile accessories.
+
+Recommendations should adapt to Rahul’s browsing and purchase history, showing “Complete Your Electronics Kit” style AI cards.
+
+AI Card Examples:
+
+Personalized Card: “Rahul is upgrading his laptop for work. Suggested bundle: Laptop + Wireless Mouse + Laptop Sleeve.”
+
+Content-Based Card: “Complete Your Mobile Setup: Phone + Protective Case + Fast Charger.”
+
+Collaborative Card: “Frequently Bought Together: Laptop + External SSD.”
+
+Hybrid Card: “Recommended For You: Curated mix of trending laptops and Rahul’s preferred accessories.”
+
+Anonymous User Experience:
+
+Homepage should default to editorial + popularity-based widgets (e.g., “Top Trending Mobiles,” “Best Laptop Deals”).
+
+PDP (Product Detail Page) should show Frequently Bought Together and Trending Accessories.
+
+Cart Page should highlight Cross-Sell Opportunities (e.g., chargers, headphones).
+
+No personal AI cards, but still engaging through curated collections.
+
+Deliverable:  
+Design recommendation widget mockups for Homepage, PDP, and Cart Page, including AI Cards. Show how the recommendation engine logic changes between:
+
+Logged-in User (Rahul)
+
+Anonymous User
