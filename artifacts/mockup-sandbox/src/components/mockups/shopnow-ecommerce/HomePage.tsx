@@ -87,17 +87,17 @@ export function HomePage() {
           
           <div className="grid grid-cols-4 gap-4">
             {[
-              { name: "Galaxy S23 Ultra", price: "₹89,999", old: "₹1,24,999", off: "28%", img: "Smartphone" },
-              { name: "Sony WH-1000XM5", price: "₹24,990", old: "₹34,990", off: "29%", img: "Headphones" },
-              { name: "iPad Air (M1)", price: "₹49,900", old: "₹59,900", off: "16%", img: "Laptop" },
-              { name: "Smart TV 4K 55\"", price: "₹36,990", old: "₹54,990", off: "32%", img: "MonitorPlay" },
+              { name: "Galaxy S23 Ultra", price: "₹89,999", old: "₹1,24,999", off: "28%", img: "/__mockup/images/galaxy-s23.jpg" },
+              { name: "Sony WH-1000XM5", price: "₹24,990", old: "₹34,990", off: "29%", img: "/__mockup/images/sony-headphones.jpg" },
+              { name: "iPad Air (M1)", price: "₹49,900", old: "₹59,900", off: "16%", img: "/__mockup/images/ipad-air.jpg" },
+              { name: "Smart TV 4K 55\"", price: "₹36,990", old: "₹54,990", off: "32%", img: "/__mockup/images/smart-tv.jpg" },
             ].map((deal, i) => (
               <div key={i} className="border border-gray-200 rounded-xl p-4 hover:shadow-lg transition-shadow bg-white relative group cursor-pointer">
                 <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
                   -{deal.off}
                 </div>
-                <div className="h-40 bg-gray-50 rounded-lg mb-4 flex items-center justify-center">
-                  <Cpu size={48} className="text-gray-300" />
+                <div className="h-40 bg-gray-50 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                  <img src={deal.img} alt={deal.name} className="w-full h-full object-contain mix-blend-multiply" />
                 </div>
                 <h3 className="font-semibold text-gray-900 text-sm mb-1">{deal.name}</h3>
                 <div className="flex items-center gap-2 mb-2">
