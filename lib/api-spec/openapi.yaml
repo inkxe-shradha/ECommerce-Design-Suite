@@ -3,20 +3,26 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: ShopNow Electronics API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: products
+    description: Product catalog
+  - name: recommendations
+    description: AI-powered recommendation widgets
+  - name: cart
+    description: Shopping cart
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +30,195 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List products with optional filters
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: featured
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/deals:
+    get:
+      operationId: listDeals
+      tags: [products]
+      summary: Top deals with time-limited discounts
+      responses:
+        "200":
+          description: List of deal products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get product detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+
+  /recommendations/homepage:
+    get:
+      operationId: getHomepageRecommendations
+      tags: [recommendations]
+      summary: All three recommendation widget types for homepage
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Recommendation widgets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomepageRecommendations"
+
+  /recommendations/pdp/{productId}:
+    get:
+      operationId: getPdpRecommendations
+      tags: [recommendations]
+      summary: PDP recommendation widgets (frequently bought together, content-based, hybrid)
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDP recommendation widgets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PdpRecommendations"
+
+  /recommendations/cart:
+    get:
+      operationId: getCartRecommendations
+      tags: [recommendations]
+      summary: Cart-based cross-sell recommendations
+      responses:
+        "200":
+          description: Cart recommendation widgets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartRecommendations"
+
+  /cart:
+    get:
+      operationId: getCart
+      tags: [cart]
+      summary: Get current session cart
+      responses:
+        "200":
+          description: Cart with items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /cart/items:
+    post:
+      operationId: addToCart
+      tags: [cart]
+      summary: Add a product to cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartItemInput"
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /cart/items/{productId}:
+    patch:
+      operationId: updateCartItem
+      tags: [cart]
+      summary: Update quantity of a cart item
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartItemUpdate"
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+    delete:
+      operationId: removeFromCart
+      tags: [cart]
+      summary: Remove item from cart
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +229,174 @@ components:
       required:
         - status
 
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - brand
+        - price
+        - category
+        - imageUrl
+        - rating
+        - reviewCount
+        - inStock
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        brand:
+          type: string
+        price:
+          type: number
+        originalPrice:
+          type: ["number", "null"]
+        discountPct:
+          type: ["integer", "null"]
+        category:
+          type: string
+        imageUrl:
+          type: string
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+        inStock:
+          type: boolean
+        stockCount:
+          type: ["integer", "null"]
+        specs:
+          type: ["string", "null"]
+        isFeatured:
+          type: boolean
+        isDeal:
+          type: boolean
+
+    RecommendationWidget:
+      type: object
+      required:
+        - type
+        - title
+        - subtitle
+        - products
+      properties:
+        type:
+          type: string
+          enum: [content_based, collaborative, hybrid]
+        title:
+          type: string
+        subtitle:
+          type: string
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecommendedProduct"
+
+    RecommendedProduct:
+      type: object
+      required:
+        - product
+        - reason
+      properties:
+        product:
+          $ref: "#/components/schemas/Product"
+        reason:
+          type: string
+
+    HomepageRecommendations:
+      type: object
+      required:
+        - contentBased
+        - collaborative
+        - hybrid
+      properties:
+        contentBased:
+          $ref: "#/components/schemas/RecommendationWidget"
+        collaborative:
+          $ref: "#/components/schemas/RecommendationWidget"
+        hybrid:
+          $ref: "#/components/schemas/RecommendationWidget"
+
+    PdpRecommendations:
+      type: object
+      required:
+        - frequentlyBoughtTogether
+        - contentBased
+        - hybrid
+      properties:
+        frequentlyBoughtTogether:
+          $ref: "#/components/schemas/RecommendationWidget"
+        contentBased:
+          $ref: "#/components/schemas/RecommendationWidget"
+        hybrid:
+          $ref: "#/components/schemas/RecommendationWidget"
+
+    CartRecommendations:
+      type: object
+      required:
+        - crossSell
+        - collaborative
+        - hybrid
+      properties:
+        crossSell:
+          $ref: "#/components/schemas/RecommendationWidget"
+        collaborative:
+          $ref: "#/components/schemas/RecommendationWidget"
+        hybrid:
+          $ref: "#/components/schemas/RecommendationWidget"
+
+    CartItem:
+      type: object
+      required:
+        - product
+        - quantity
+      properties:
+        product:
+          $ref: "#/components/schemas/Product"
+        quantity:
+          type: integer
+
+    Cart:
+      type: object
+      required:
+        - items
+        - subtotal
+        - discount
+        - deliveryFee
+        - total
+        - couponApplied
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+        subtotal:
+          type: number
+        discount:
+          type: number
+        deliveryFee:
+          type: number
+        total:
+          type: number
+        couponApplied:
+          type: ["string", "null"]
+
+    CartItemInput:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+
+    CartItemUpdate:
+      type: object
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
