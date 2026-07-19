@@ -3,5 +3,11 @@ type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 export const modules: ModuleMap = {
   "./components/mockups/shopnow-ecommerce/Cart.tsx": () => import("../components/mockups/shopnow-ecommerce/Cart.tsx"),
   "./components/mockups/shopnow-ecommerce/HomePage.tsx": () => import("../components/mockups/shopnow-ecommerce/HomePage.tsx"),
-  "./components/mockups/shopnow-ecommerce/PDP.tsx": () => import("../components/mockups/shopnow-ecommerce/PDP.tsx")
+  "./components/mockups/shopnow-ecommerce/PDP.tsx": () => import("../components/mockups/shopnow-ecommerce/PDP.tsx"),
+  "./components/mockups/shopnow-ux/AnonCart.tsx": () => import("../components/mockups/shopnow-ux/AnonCart.tsx"),
+  "./components/mockups/shopnow-ux/AnonHomePage.tsx": () => import("../components/mockups/shopnow-ux/AnonHomePage.tsx"),
+  "./components/mockups/shopnow-ux/AnonPDP.tsx": () => import("../components/mockups/shopnow-ux/AnonPDP.tsx"),
+  "./components/mockups/shopnow-ux/LoggedInCart.tsx": () => import("../components/mockups/shopnow-ux/LoggedInCart.tsx"),
+  "./components/mockups/shopnow-ux/LoggedInHomePage.tsx": () => import("../components/mockups/shopnow-ux/LoggedInHomePage.tsx"),
+  "./components/mockups/shopnow-ux/LoggedInPDP.tsx": () => import("../components/mockups/shopnow-ux/LoggedInPDP.tsx")
 };
