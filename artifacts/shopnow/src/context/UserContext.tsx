@@ -76,6 +76,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     wasLoggedInRef.current = false; // Reset since session expired
     console.log('[UserContext] Handling session expiry');
     setSessionExpired(true);
+    try {
+      sessionStorage.removeItem('shopnow_ai_chat');
+    } catch {}
     queryClient.clear();
     queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetCartQueryKey() });
@@ -117,6 +120,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     } finally {
       logoutInProgressRef.current = true; // Set flag for session expiry logout
       wasLoggedInRef.current = false; // Reset since user is now logged out
+      try {
+        sessionStorage.removeItem('shopnow_ai_chat');
+      } catch {}
       queryClient.clear();
       queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       queryClient.invalidateQueries({ queryKey: getGetCartQueryKey() });

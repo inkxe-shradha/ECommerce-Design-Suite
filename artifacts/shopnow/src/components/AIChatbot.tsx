@@ -124,6 +124,22 @@ export function AIChatbot() {
     persistChat(messages, hasOpened);
   }, [messages, hasOpened]);
 
+  // Automatically clear AI chat cache when user logs out
+  const prevIsLoggedInRef = useRef(isLoggedIn);
+  useEffect(() => {
+    if (prevIsLoggedInRef.current && !isLoggedIn) {
+      setMessages([]);
+      setHasOpened(false);
+      setCompareProducts([]);
+      setShowCompare(false);
+      setPendingRecommendContext(null);
+      try {
+        sessionStorage.removeItem(CHAT_STORAGE_KEY);
+      } catch {}
+    }
+    prevIsLoggedInRef.current = isLoggedIn;
+  }, [isLoggedIn]);
+
   const chatMutation = useMutation({
     mutationFn: async (message: string) => {
       // Build history from last 6 messages for context
