@@ -17,6 +17,55 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Register a new user account
+ */
+export const RegisterBody = zod.object({
+  "name": zod.string(),
+  "email": zod.string(),
+  "password": zod.string()
+})
+
+export const RegisterResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string()
+})
+
+
+/**
+ * @summary Login with email and password
+ */
+export const LoginBody = zod.object({
+  "email": zod.string(),
+  "password": zod.string()
+})
+
+export const LoginResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string()
+})
+
+
+/**
+ * @summary Logout current session
+ */
+export const LogoutResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Get currently authenticated user profile
+ */
+export const GetMeResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "email": zod.string()
+})
+
+
+/**
  * @summary List products with optional filters
  */
 export const ListProductsQueryParams = zod.object({
@@ -66,6 +115,57 @@ export const ListDealsResponseItem = zod.object({
   "isDeal": zod.boolean().optional()
 })
 export const ListDealsResponse = zod.array(ListDealsResponseItem)
+
+
+/**
+ * @summary Search products with text query and filters
+ */
+export const searchProductsQueryPageDefault = 1;
+export const searchProductsQueryLimitDefault = 20;
+
+export const SearchProductsQueryParams = zod.object({
+  "q": zod.coerce.string().optional().describe('Text search query (matches name, brand, category)'),
+  "category": zod.coerce.string().optional(),
+  "minPrice": zod.coerce.number().optional(),
+  "maxPrice": zod.coerce.number().optional(),
+  "inStock": zod.coerce.boolean().optional(),
+  "sortBy": zod.enum(['relevance', 'price_asc', 'price_desc', 'rating', 'newest']).optional(),
+  "page": zod.coerce.number().default(searchProductsQueryPageDefault),
+  "limit": zod.coerce.number().default(searchProductsQueryLimitDefault)
+})
+
+export const SearchProductsResponse = zod.object({
+  "products": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "brand": zod.string(),
+  "price": zod.number(),
+  "originalPrice": zod.number().nullish(),
+  "discountPct": zod.number().nullish(),
+  "category": zod.string(),
+  "imageUrl": zod.string(),
+  "rating": zod.number(),
+  "reviewCount": zod.number(),
+  "inStock": zod.boolean(),
+  "stockCount": zod.number().nullish(),
+  "specs": zod.string().nullish(),
+  "isFeatured": zod.boolean().optional(),
+  "isDeal": zod.boolean().optional()
+})),
+  "total": zod.number(),
+  "page": zod.number(),
+  "totalPages": zod.number()
+})
+
+
+/**
+ * @summary Get all product categories with counts
+ */
+export const GetCategoriesResponseItem = zod.object({
+  "name": zod.string(),
+  "count": zod.number()
+})
+export const GetCategoriesResponse = zod.array(GetCategoriesResponseItem)
 
 
 /**
@@ -490,6 +590,59 @@ export const RemoveFromCartResponse = zod.object({
   "deliveryFee": zod.number(),
   "total": zod.number(),
   "couponApplied": zod.string().nullable()
+})
+
+
+/**
+ * @summary Process checkout
+ */
+export const ProcessCheckoutBody = zod.object({
+  "address": zod.object({
+  "name": zod.string().optional(),
+  "street": zod.string().optional(),
+  "city": zod.string().optional(),
+  "zip": zod.string().optional()
+}),
+  "payment": zod.object({
+  "cardNumber": zod.string().optional(),
+  "expiry": zod.string().optional(),
+  "cvv": zod.string().optional()
+})
+})
+
+export const ProcessCheckoutResponse = zod.object({
+  "message": zod.string(),
+  "orderId": zod.number()
+})
+
+
+/**
+ * @summary Get user order history
+ */
+export const GetOrdersResponseItem = zod.object({
+  "id": zod.number(),
+  "totalAmount": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string(),
+  "shippingAddress": zod.record(zod.string(), zod.unknown()).optional(),
+  "paymentDetails": zod.record(zod.string(), zod.unknown()).optional()
+})
+export const GetOrdersResponse = zod.array(GetOrdersResponseItem)
+
+
+/**
+ * @summary Send a message to the AI Chatbot
+ */
+export const AiChatBody = zod.object({
+  "message": zod.string(),
+  "history": zod.array(zod.object({
+  "role": zod.string().optional(),
+  "content": zod.string().optional()
+})).optional()
+})
+
+export const AiChatResponse = zod.object({
+  "response": zod.string()
 })
 
 

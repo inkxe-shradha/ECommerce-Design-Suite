@@ -13,7 +13,7 @@ export function AppLayout({
   children,
   cartCount = 0,
   isLoggedIn = true,
-  userName = "Rahul",
+  userName = "",
   activePage = "home",
 }: AppLayoutProps) {
   return (

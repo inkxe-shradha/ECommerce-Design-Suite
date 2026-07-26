@@ -6,17 +6,35 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './aIChatInput';
+export * from './aIChatInputHistoryItem';
+export * from './aIChatResponse';
+export * from './authMessage';
 export * from './cart';
 export * from './cartItem';
 export * from './cartItemInput';
 export * from './cartItemUpdate';
 export * from './cartRecommendations';
+export * from './categoryInfo';
+export * from './checkoutInput';
+export * from './checkoutInputAddress';
+export * from './checkoutInputPayment';
 export * from './getHomepageRecommendationsParams';
 export * from './healthStatus';
 export * from './homepageRecommendations';
 export * from './listProductsParams';
+export * from './loginInput';
+export * from './order';
+export * from './orderPaymentDetails';
+export * from './orderShippingAddress';
+export * from './orderSuccess';
 export * from './pdpRecommendations';
 export * from './product';
+export * from './productSearchResult';
 export * from './recommendationWidget';
 export * from './recommendationWidgetType';
 export * from './recommendedProduct';
+export * from './registerInput';
+export * from './searchProductsParams';
+export * from './searchProductsSortBy';
+export * from './user';

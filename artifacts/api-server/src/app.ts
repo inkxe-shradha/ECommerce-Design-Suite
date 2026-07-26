@@ -1,8 +1,14 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
+import dotenv from "dotenv";
+import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
+
+dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
+dotenv.config();
 
 const app: Express = express();
 
@@ -26,6 +32,7 @@ app.use(
   }),
 );
 app.use(cors());
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

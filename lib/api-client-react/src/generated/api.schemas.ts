@@ -94,11 +94,119 @@ export interface CartItemUpdate {
   quantity: number;
 }
 
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface AuthMessage {
+  message: string;
+}
+
+export type CheckoutInputAddress = {
+  name?: string;
+  street?: string;
+  city?: string;
+  zip?: string;
+};
+
+export type CheckoutInputPayment = {
+  cardNumber?: string;
+  expiry?: string;
+  cvv?: string;
+};
+
+export interface CheckoutInput {
+  address: CheckoutInputAddress;
+  payment: CheckoutInputPayment;
+}
+
+export interface OrderSuccess {
+  message: string;
+  orderId: number;
+}
+
+export type OrderShippingAddress = { [key: string]: unknown };
+
+export type OrderPaymentDetails = { [key: string]: unknown };
+
+export interface Order {
+  id: number;
+  totalAmount: string;
+  status: string;
+  createdAt: string;
+  shippingAddress?: OrderShippingAddress;
+  paymentDetails?: OrderPaymentDetails;
+}
+
+export type AIChatInputHistoryItem = {
+  role?: string;
+  content?: string;
+};
+
+export interface AIChatInput {
+  message: string;
+  history?: AIChatInputHistoryItem[];
+}
+
+export interface AIChatResponse {
+  response: string;
+}
+
+export interface ProductSearchResult {
+  products: Product[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
+export interface CategoryInfo {
+  name: string;
+  count: number;
+}
+
 export type ListProductsParams = {
 category?: string;
 featured?: boolean;
 limit?: number;
 };
+
+export type SearchProductsParams = {
+/**
+ * Text search query (matches name, brand, category)
+ */
+q?: string;
+category?: string;
+minPrice?: number;
+maxPrice?: number;
+inStock?: boolean;
+sortBy?: SearchProductsSortBy;
+page?: number;
+limit?: number;
+};
+
+export type SearchProductsSortBy = typeof SearchProductsSortBy[keyof typeof SearchProductsSortBy];
+
+
+export const SearchProductsSortBy = {
+  relevance: 'relevance',
+  price_asc: 'price_asc',
+  price_desc: 'price_desc',
+  rating: 'rating',
+  newest: 'newest',
+} as const;
 
 export type GetHomepageRecommendationsParams = {
 /**

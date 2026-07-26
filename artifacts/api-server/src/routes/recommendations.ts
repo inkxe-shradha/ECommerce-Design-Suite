@@ -1,7 +1,25 @@
 import { Router } from "express";
 import { ne, eq } from "drizzle-orm";
-import { db, productsTable } from "@workspace/db";
+import { db, productsTable, usersTable } from '@workspace/db';
 import { GetPdpRecommendationsParams } from "@workspace/api-zod";
+import { cacheMiddleware } from '../middlewares/cache.js';
+
+const THREE_MIN = 3 * 60 * 1000;
+
+async function getFirstName(req: any): Promise<string> {
+  const userIdStr = req.cookies?.session_user_id;
+  if (!userIdStr) return 'You';
+  try {
+    const userId = parseInt(userIdStr, 10);
+    const [user] = await db
+      .select({ name: usersTable.name })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+    return user ? user.name.trim().split(/\s+/)[0] : 'You';
+  } catch {
+    return 'You';
+  }
+}
 
 const router = Router();
 
@@ -32,7 +50,9 @@ function makeWidget(
   };
 }
 
-router.get("/recommendations/homepage", async (req, res): Promise<void> => {
+// Homepage recs: cache 3 min (personalised but stable)
+router.get("/recommendations/homepage", cacheMiddleware(THREE_MIN), async (req, res): Promise<void> => {
+  const firstName = await getFirstName(req);
   const allProducts = await db.select().from(productsTable).limit(30);
 
   const laptopsAndAccessories = allProducts.filter((p) =>
@@ -45,46 +65,48 @@ router.get("/recommendations/homepage", async (req, res): Promise<void> => {
 
   res.json({
     contentBased: makeWidget(
-      "content_based",
-      "Based on Your Interests",
-      "Electronics matching your browsing history",
+      'content_based',
+      'Based on Your Interests',
+      'Electronics matching your browsing history',
       laptopsAndAccessories.slice(0, 5),
       [
-        "Similar to your browsing",
-        "Matches Laptops",
-        "Frequently viewed",
-        "Accessory match",
-        "Similar to your browsing",
-      ]
+        'Similar to your browsing',
+        'Matches Laptops',
+        'Frequently viewed',
+        'Accessory match',
+        'Similar to your browsing',
+      ],
     ),
     collaborative: makeWidget(
-      "collaborative",
-      "Trending Among Similar Shoppers",
-      "What people like you are buying this week",
+      'collaborative',
+      'Trending Among Similar Shoppers',
+      'What people like you are buying this week',
       trending.slice(0, 4),
       [
-        "Trending in your segment",
-        "Popular this week",
-        "High demand — only 4 left",
-        "People like you bought this",
-      ]
+        'Trending in your segment',
+        'Popular this week',
+        'High demand — only 4 left',
+        'People like you bought this',
+      ],
     ),
     hybrid: makeWidget(
-      "hybrid",
-      "Recommended For You",
-      "Curated mix of trending picks and your preferences",
+      'hybrid',
+      `${firstName}'s Top Picks`,
+      'Curated mix of trending picks and your preferences',
       hybrid.slice(0, 4),
       [
-        "Editorial pick + your history",
-        "Trending + personalized",
-        "Top rated for your profile",
-        "Curated for Rahul",
-      ]
+        'Editorial pick + your history',
+        'Trending + personalized',
+        'Top rated for your profile',
+        `Curated for ${firstName}`,
+      ],
     ),
   });
 });
 
-router.get("/recommendations/pdp/:productId", async (req, res): Promise<void> => {
+// PDP recs: cache 3 min per product
+router.get("/recommendations/pdp/:productId", cacheMiddleware(THREE_MIN), async (req, res): Promise<void> => {
+  const firstName = await getFirstName(req);
   const rawId = Array.isArray(req.params.productId)
     ? req.params.productId[0]
     : req.params.productId;
@@ -110,43 +132,45 @@ router.get("/recommendations/pdp/:productId", async (req, res): Promise<void> =>
 
   res.json({
     frequentlyBoughtTogether: makeWidget(
-      "collaborative",
-      "Frequently Bought Together",
-      "Customers who bought this also bought",
+      'collaborative',
+      'Frequently Bought Together',
+      'Customers who bought this also bought',
       accessories.slice(0, 3),
       [
-        "Often bought together",
-        "Popular add-on",
-        "Frequently paired with this",
-      ]
+        'Often bought together',
+        'Popular add-on',
+        'Frequently paired with this',
+      ],
     ),
     contentBased: makeWidget(
-      "content_based",
-      "Complete Your Setup",
+      'content_based',
+      'Complete Your Setup',
       "Accessories matching this product's specs and color",
       accessories.slice(0, 4),
       [
-        "USB-C compatible",
-        "Color matched",
-        "Spec compatible",
-        "Frequently used together",
-      ]
+        'USB-C compatible',
+        'Color matched',
+        'Spec compatible',
+        'Frequently used together',
+      ],
     ),
     hybrid: makeWidget(
-      "hybrid",
-      "Rahul's AI Bundle Suggestion",
+      'hybrid',
+      `${firstName}'s AI Bundle Suggestion`,
       "Upgrading for work? Here's your kit",
       featured.slice(0, 3),
       [
-        "Editorial pick + your history",
-        "Trending + your preferences",
-        "Curated for your work style",
-      ]
+        'Editorial pick + your history',
+        'Trending + your preferences',
+        'Curated for your work style',
+      ],
     ),
   });
 });
 
-router.get("/recommendations/cart", async (req, res): Promise<void> => {
+// Cart recs: cache 3 min
+router.get("/recommendations/cart", cacheMiddleware(THREE_MIN), async (req, res): Promise<void> => {
+  const firstName = await getFirstName(req);
   const allProducts = await db.select().from(productsTable).limit(20);
 
   const crossSell = allProducts.filter((p) =>
@@ -157,34 +181,34 @@ router.get("/recommendations/cart", async (req, res): Promise<void> => {
 
   res.json({
     crossSell: makeWidget(
-      "content_based",
-      "Complete Your Setup",
-      "You might also need these with your cart",
+      'content_based',
+      'Complete Your Setup',
+      'You might also need these with your cart',
       crossSell.slice(0, 4),
       [
-        "Pairs with Dell XPS 15",
-        "Compatible accessory",
-        "Great with your laptop",
-        "Often added to similar carts",
-      ]
+        'Pairs with Dell XPS 15',
+        'Compatible accessory',
+        'Great with your laptop',
+        'Often added to similar carts',
+      ],
     ),
     collaborative: makeWidget(
-      "collaborative",
-      "Frequently Bought Together",
-      "Shoppers with a similar cart also bought these",
+      'collaborative',
+      'Frequently Bought Together',
+      'Shoppers with a similar cart also bought these',
       collaborative.slice(0, 3),
       [
-        "Trending in your segment",
-        "Popular with similar carts",
-        "Limited stock — popular item",
-      ]
+        'Trending in your segment',
+        'Popular with similar carts',
+        'Limited stock — popular item',
+      ],
     ),
     hybrid: makeWidget(
-      "hybrid",
-      "Rahul's Personal AI Picks",
-      "Based on your browsing and purchase history",
+      'hybrid',
+      `${firstName}'s Personal AI Picks`,
+      'Based on your browsing and purchase history',
       hybrid.slice(0, 3),
-      ["You viewed this", "Trending in your segment", "Editorial pick"]
+      ['You viewed this', 'Trending in your segment', 'Editorial pick'],
     ),
   });
 });
