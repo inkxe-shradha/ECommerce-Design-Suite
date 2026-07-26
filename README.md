@@ -1,0 +1,155 @@
+# 🛒 ECommerce Design Suite
+
+> A modern, type-safe full-stack e-commerce ecosystem featuring an **Express 5 API server**, an **Agentic AI Shopping Assistant**, a **Vite/React 19 storefront ("ShopNow Electronics")**, and an **interactive visual component mockup sandbox**. Built on **Contract-First API Design** with OpenAPI 3.1, Orval, and Drizzle ORM.
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Express.js](https://img.shields.io/badge/Express-5.0-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Drizzle_ORM-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://orm.drizzle.team/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![pnpm Workspaces](https://img.shields.io/badge/pnpm-Workspaces-F69220?style=for-the-badge&logo=pnpm&logoColor=white)](https://pnpm.io/)
+
+---
+
+## 🌟 Highlights & Key Features
+
+### 🛍️ 1. ShopNow Electronics Storefront
+- **Modern E-Commerce UI**: Built with React 19, Tailwind CSS v4, Radix UI primitives, Lucide icons, and Framer Motion micro-animations.
+- **Product Discovery**: Fast full-text product search, category filters, price sliders, time-limited flash deals, and sort parameters (`price`, `rating`, `newest`).
+- **Interactive Product Detail Pages (PDP)**: High-res image gallery with thumbnail switches, dynamic inventory badges, specifications grid, and verified customer star reviews.
+- **Seamless Cart & Checkout**: Slide-out drawer & full cart view, promo code support, address modal, instant order placement, and order confirmation.
+- **User Dashboard & Order History**: User registration with salted password hashing, profile session management, itemized order tracking, and receipt views.
+
+### 🤖 2. Multi-Agent AI Shopping Assistant
+- **Agentic Router System**: An intelligent AI Chatbot (`AIChatbot.tsx`) powered by specialized backend sub-agents:
+  - 🔍 **Product Search Agent**: Finds products matching specific specifications or budgets.
+  - 🎁 **Bundle Advisor Agent**: Recommends complementary accessories and deal packages.
+  - 📦 **Order Tracking Agent**: Looks up status and items for historical user orders.
+  - ⚖️ **Comparison Agent**: Side-by-side feature comparisons between electronics.
+  - ⭐ **Top Picks Agent**: Curates highest-rated trending tech items.
+- **Rich Markdown Formatting**: Answers include custom Markdown rendering (`MarkdownMessage.tsx`) with formatted tables, bold key features, and inline product links.
+
+### 🎯 3. Personalization & Recommendation Engine
+- **Homepage Widgets**: Dynamic carousels for *Trending Tech*, *Best Sellers*, and *Personalized For You*.
+- **PDP Widgets**: *Frequently Bought Together* product bundles and content-based alternatives.
+- **Cart Widgets**: Real-time cross-sell recommendations tailored to current cart line items.
+- **Anonymous & Logged-In Modes**: Gracefully falls back to top-rated accessories when users browse anonymously.
+
+### 🔄 4. Contract-First API & Codegen Pipeline
+- **OpenAPI 3.1 Single Source of Truth**: Endpoints, parameters, schemas, and responses are declared in [`lib/api-spec/openapi.yaml`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/lib/api-spec/openapi.yaml).
+- **Automated Orval Codegen**:
+  - Generates Zod validation rules (`@workspace/api-zod`) for Express 5 backend routes.
+  - Generates TanStack React Query hooks (`@workspace/api-client-react`) for type-safe frontend fetch calls.
+- **Zero API Drift**: Request payloads that deviate from OpenAPI specs are caught instantly at compile-time and runtime.
+
+### 🎨 5. Isolated Mockup Preview Sandbox
+- **Visual Design Canvas**: A dedicated Vite environment (`artifacts/mockup-sandbox`) designed for UI/UX developers to test design mockups without database dependencies.
+- **Hot-Reloading Mockup Scanner**: Custom Vite plugin (`mockupPreviewPlugin.ts`) dynamically scans mockup directories and generates preview routes on-the-fly.
+
+---
+
+## 🏗️ Architecture & Monorepo Map
+
+```
+ECommerce-Design-Suite/
+├── artifacts/                  # Deployable Applications & Backend Services
+│   ├── api-server/             # Express 5 REST API Server (Auth, Products, Cart, Orders, AI, Reviews)
+│   ├── shopnow/                # Main React 19 Frontend Web App ("ShopNow Electronics")
+│   └── mockup-sandbox/         # Isolated Visual Component Preview Canvas
+├── lib/                        # Shared Workspace Libraries
+│   ├── api-spec/               # OpenAPI 3.1 specification & Orval configuration
+│   ├── api-zod/                # Auto-generated Zod request/response validation schemas
+│   ├── api-client-react/       # Auto-generated React Query hooks with custom fetcher
+│   └── db/                     # Drizzle ORM PostgreSQL connection pool & schemas
+├── docs/                       # Architecture documents & implementation checklists
+├── ARCHITECTURE.md             # In-depth system architecture guide
+└── replit.md                   # Workspace operating instructions & repo map
+```
+
+---
+
+## 🛠️ Technology Stack
+
+| Domain | Technology | Description |
+| :--- | :--- | :--- |
+| **Monorepo** | `pnpm` Workspaces, TypeScript 5.9 | High-performance monorepo management |
+| **Backend API** | Express 5, Node.js 24, Pino Logger | High-throughput REST API with structured logging |
+| **Database & ORM** | PostgreSQL, Drizzle ORM | Type-safe schema definition and querying |
+| **Contract & Validation** | OpenAPI 3.1, Orval, Zod | End-to-end code generation and runtime validation |
+| **Frontend Framework** | React 19, Vite, TanStack Query v5 | Modern UI rendering with automatic server-state caching |
+| **Styling & UI** | Tailwind CSS v4, Radix UI, Lucide | Responsive design system & accessible primitives |
+| **AI Integration** | Google GenAI SDK (Gemini) | Multi-agent AI shopping assistant system |
+
+---
+
+## ⚡ Quick Start Guide
+
+### Prerequisites
+- **Node.js**: v20 or higher
+- **pnpm**: v9 or higher
+- **PostgreSQL**: Local or hosted database instance
+
+### 1. Clone & Install Dependencies
+```bash
+git clone https://github.com/inkxe-shradha/ECommerce-Design-Suite.git
+cd ECommerce-Design-Suite
+pnpm install
+```
+
+### 2. Environment Configuration
+Create a `.env` file in the root directory (never committed to version control):
+```env
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/ecommerce
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+### 3. Database Migration & Seeding
+```bash
+# Push Drizzle schema to PostgreSQL
+pnpm --filter @workspace/db run push
+
+# Seed catalog & reviews
+pnpm --filter @workspace/db run seed
+```
+
+### 4. Run Applications
+```bash
+# Start Express Backend API Server (Port 5000)
+pnpm --filter @workspace/api-server run dev
+
+# Start ShopNow Frontend App (Port 3000 / Vite)
+pnpm --filter @workspace/shopnow run dev
+
+# Start Mockup Preview Sandbox Canvas
+pnpm --filter @workspace/mockup-sandbox run dev
+```
+
+---
+
+## 🧪 Quality Assurance & Commands
+
+| Command | Action |
+| :--- | :--- |
+| `pnpm run typecheck` | Executes TypeScript type verification across all workspaces |
+| `pnpm run build` | Compiles production builds for all apps and shared libraries |
+| `pnpm --filter @workspace/api-spec run codegen` | Re-syncs React Query hooks & Zod schemas from `openapi.yaml` |
+
+---
+
+## 🔒 Security & Best Practices
+
+- **Zero Secret Exposure**: All API keys and connection strings are managed strictly via environment variables (`.env` is excluded via `.gitignore`).
+- **Input Sanitization**: Request bodies are validated using strict Zod schemas before hitting business logic.
+- **Salted Password Hashing**: User authentication utilizes cryptographic salt & hashing routines to secure credentials.
+
+---
+
+## 📄 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+<p align="center">
+  Crafted with ❤️ for full-stack e-commerce excellence.
+</p>
