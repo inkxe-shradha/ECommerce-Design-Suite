@@ -8,30 +8,40 @@ const cameras = ['Sony A7 IV', 'Sony ZV-E10', 'Canon EOS R5', 'Canon EOS R50', '
 
 const categoryImages = {
   Mobiles: [
-    'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1598327105666-5b89351aff97?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1533228100845-08145b01de14?q=80&w=500&auto=format&fit=crop'
+    'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1533228100845-08145b01de14?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1559056199-641a0ac8b3f4?w=500&h=500&fit=crop',
   ],
   Laptops: [
-    'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1531297172867-2144ce699564?q=80&w=500&auto=format&fit=crop'
+    'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1531297172867-2144ce699564?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1588872657360-611d2d67d0e2?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=500&h=500&fit=crop',
   ],
   Audio: [
-    'https://images.unsplash.com/photo-1546435770-a3e426fac332?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1583394838336-acd977736f90?q=80&w=500&auto=format&fit=crop'
+    'https://images.unsplash.com/photo-1546435770-a3e426fac332?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1618366712010-f4ae9c647dcb?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1487215078519-e21cc028cb29?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=500&fit=crop',
   ],
   Accessories: [
-    'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1586816879360-004f5b0c51e3?q=80&w=500&auto=format&fit=crop'
+    'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1592899677977-9c10ca588bbd?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1586816879360-004f5b0c51e3?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500&h=500&fit=crop',
   ],
   Cameras: [
-    'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?q=80&w=500&auto=format&fit=crop',
-    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?q=80&w=500&auto=format&fit=crop'
-  ]
+    'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1502920917128-1aa500764cbd?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1606533248051-5ce98c146c33?w=500&h=500&fit=crop',
+    'https://images.unsplash.com/photo-1611532736579-6b16e2b50449?w=500&h=500&fit=crop',
+  ],
 };
 
 const generate = (names, cat, startIdx) => {
