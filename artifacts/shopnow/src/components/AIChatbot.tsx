@@ -568,32 +568,44 @@ export function AIChatbot() {
                       <div
                         className={`flex items-end gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                       >
+                        {msg.role === 'user' && (
+                          <div className="mb-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-indigo-200 bg-indigo-100 text-[11px] font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200">
+                            {displayName.slice(0, 1).toUpperCase() || 'Y'}
+                          </div>
+                        )}
                         {msg.role === 'ai' && (
                           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center shrink-0 mb-1">
                             <Sparkles size={12} className="text-white" />
                           </div>
                         )}
-                        <div
-                          className={`max-w-[90%] sm:max-w-[85%] lg:max-w-[80%] 2xl:max-w-[75%] px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-2xl text-sm leading-relaxed ${
-                            msg.role === 'user'
-                              ? 'bg-indigo-600 text-white rounded-br-sm whitespace-pre-wrap'
-                              : 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-700 rounded-tl-sm'
-                          }`}
-                        >
-                          {msg.role === 'ai' ? (
-                            <MarkdownMessage content={msg.text} />
-                          ) : (
-                            msg.text
+                        <div className="max-w-[90%] sm:max-w-[85%] lg:max-w-[80%] 2xl:max-w-[75%]">
+                          {msg.role === 'user' && (
+                            <div className="mb-1 pr-1 text-right text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+                              You
+                            </div>
                           )}
-                          {msg.requiresLogin && (
-                            <Link
-                              href="/login"
-                              onClick={() => setIsOpen(false)}
-                              className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors"
-                            >
-                              Log In <ChevronRight size={12} />
-                            </Link>
-                          )}
+                          <div
+                            className={`px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-2xl text-sm leading-relaxed ${
+                              msg.role === 'user'
+                                ? 'border border-indigo-500/30 bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-sm rounded-br-sm whitespace-pre-wrap'
+                                : 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-700 rounded-tl-sm'
+                            }`}
+                          >
+                            {msg.role === 'ai' ? (
+                              <MarkdownMessage content={msg.text} />
+                            ) : (
+                              msg.text
+                            )}
+                            {msg.requiresLogin && (
+                              <Link
+                                href="/login"
+                                onClick={() => setIsOpen(false)}
+                                className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors"
+                              >
+                                Log In <ChevronRight size={12} />
+                              </Link>
+                            )}
+                          </div>
                         </div>
                       </div>
 

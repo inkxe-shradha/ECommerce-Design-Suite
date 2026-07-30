@@ -9,12 +9,15 @@ import { rm } from "node:fs/promises";
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
+const watchMode = process.argv.includes("--watch");
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
-  await rm(distDir, { recursive: true, force: true });
+  if (!watchMode) {
+    await rm(distDir, { recursive: true, force: true });
+  }
 
-  await esbuild({
+  const buildOptions = {
     entryPoints: [
       path.resolve(artifactDir, "src/index.ts"),
       path.resolve(artifactDir, "src/preload.ts"),
@@ -120,7 +123,16 @@ globalThis.__filename = __bannerUrl.fileURLToPath(import.meta.url);
 globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
-  });
+  };
+
+  if (watchMode) {
+    const context = await esbuild.context(buildOptions);
+    await context.watch();
+    console.log("Watching API server source files for changes...");
+    return;
+  }
+
+  await esbuild(buildOptions);
 }
 
 buildAll().catch((err) => {

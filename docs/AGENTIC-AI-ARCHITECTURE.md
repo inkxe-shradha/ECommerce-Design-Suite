@@ -2,7 +2,7 @@
 
 ## Overview
 
-ShopNow implements a **multi-agent conversational AI** system that provides personalized, multi-turn shopping assistance. The system uses Google Gemini for intent classification and a router-based agent dispatch pattern to handle diverse shopping intents — including intelligent profession-based bundle recommendations, inventory-aware product search, and non-electronics guardrails.
+ShopNow implements a **supervisor-driven, graph-style multi-agent conversational AI** system that provides personalized, multi-turn shopping assistance. The system uses Google Gemini for intent classification, a supervisor for orchestration, and an explicit agent graph for specialist execution.
 
 ---
 
@@ -13,15 +13,18 @@ flowchart TD
     User([👤 User Message]) --> Frontend[🖥️ AIChatbot Component]
     Frontend -->|POST /api/ai/chat<br/>message + history| API[📡 API Route Handler]
     API --> LoadCtx[Load User Context<br/>Orders, Brands, Interests]
-    LoadCtx --> Router{🧠 RouterAgent<br/>Intent Classification}
+    LoadCtx --> Supervisor[🧠 SupervisorAgent]
+    Supervisor --> Router{RouterAgent<br/>Intent Classification}
 
     Router -->|Gemini API| Gemini[🔮 Google Gemini 1.5 Flash<br/>Structured JSON Output]
     Router -->|Fallback| LocalParse[📋 Local Fallback Parser<br/>Regex + Keyword Matching]
 
-    Gemini --> Dispatch
-    LocalParse --> Dispatch
+    Gemini --> Clarify{Clarification Policy}
+    LocalParse --> Clarify
+    Clarify -->|Budget only, no target| Clarification[Ask category with follow-up chips]
+    Clarify -->|Target supplied| Dispatch
 
-    Dispatch{Intent Dispatch} -->|greeting| GA[👋 GreetingAgent]
+    Dispatch{AgentGraph / GraphRunner} -->|greeting| GA[👋 GreetingAgent]
     Dispatch -->|product_search| PSA[🔍 ProductSearchAgent]
     Dispatch -->|bundle_advisor| BA[🎁 BundleAdvisorAgent]
     Dispatch -->|orders| OA[📦 OrdersAgent]
@@ -30,16 +33,18 @@ flowchart TD
     Dispatch -->|add_to_cart| ACA[🛒 AddToCartAgent]
     Dispatch -->|unknown| UA[❓ UnknownAgent]
 
-    GA --> Response
-    PSA --> Response
-    BA --> Response
-    OA --> Response
-    AA --> Response
-    TPA --> Response
-    ACA --> Response
-    UA --> Response
+    GA --> Guardrail[🛡️ GuardrailAgent<br/>Response contract validation]
+    PSA --> Guardrail
+    BA --> Guardrail
+    OA --> Guardrail
+    AA --> Guardrail
+    TPA --> Guardrail
+    ACA --> Guardrail
+    UA --> Guardrail
 
-    Response[📤 AgentResponse<br/>reply + products + followUp] --> Frontend
+    Clarification --> Guardrail
+    Guardrail --> Response[📤 AgentResponse<br/>reply + products + orders + followUp]
+    Response --> Frontend
     Frontend --> Chips[💬 Follow-up Chips<br/>Contextual Suggestions]
     Chips -->|User clicks chip| User
 ```
@@ -86,7 +91,12 @@ sequenceDiagram
 artifacts/api-server/src/agents/
 ├── index.ts                    # Barrel exports
 ├── types.ts                    # Shared interfaces
-├── router-agent.ts             # 🧠 Brain — intent classification + dispatch
+├── supervisor-agent.ts         # 🧠 Orchestrates the complete agent workflow
+├── router-agent.ts             # Intent classification only
+├── clarification-policy.ts     # Stops vague budget-only catalog searches
+├── agent-graph.ts              # Specialist nodes and intent edges
+├── graph-runner.ts             # Executes the selected graph path
+├── guardrail-agent.ts          # Validates final frontend response contract
 ├── user-context.ts             # Loads user profile from DB
 ├── greeting-agent.ts           # 👋 Welcome + personalization
 ├── product-search-agent.ts     # 🔍 Cascading product search with keyword intelligence
@@ -133,16 +143,16 @@ interface UserContext {
 
 ## Agent Details
 
-### 🧠 RouterAgent (Brain)
+### 🧠 SupervisorAgent and RouterAgent
 
 | Feature                | Implementation                                                                                             |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Primary**            | Google Gemini 1.5 Flash with structured JSON schema                                                        |
-| **Fallback**           | Local regex/keyword parser (no API key needed)                                                             |
+| **Supervisor**         | Runs classification, clarification, graph execution, and response guardrails                              |
+| **Router primary**     | Google Gemini 1.5 Flash with structured JSON schema                                                        |
+| **Router fallback**    | Local regex/keyword parser (no API key needed)                                                             |
 | **Context**            | Passes conversation history for multi-turn awareness                                                       |
-| **Intents**            | `greeting`, `product_search`, `bundle_advisor`, `orders`, `address`, `top_picks`, `add_to_cart`, `unknown` |
-| **Keyword Extraction** | Explicit model name extraction (e.g. "Galaxy S22" → keyword)                                               |
-| **Guardrails**         | Non-electronics requests redirected with helpful message                                                   |
+| **Graph intents**      | `greeting`, `product_search`, `bundle_advisor`, `orders`, `address`, `top_picks`, `add_to_cart`, `unknown` |
+| **Clarification**      | Budget-only searches ask for a category before querying products                                           |
 
 ### 🔍 ProductSearchAgent (Cascading Search)
 

@@ -1,20 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import type {
-  Agent,
-  AgentContext,
-  AgentResponse,
-  ParsedIntent,
-  UserContext,
-} from './types.js';
-import { GreetingAgent } from './greeting-agent.js';
-import { ProductSearchAgent } from './product-search-agent.js';
-import { OrdersAgent } from './orders-agent.js';
-import { AddressAgent } from './address-agent.js';
-import { TopPicksAgent } from './top-picks-agent.js';
-import { UnknownAgent } from './unknown-agent.js';
-import { AddToCartAgent } from './add-to-cart-agent.js';
-import { BundleAdvisorAgent } from './bundle-advisor-agent.js';
-import { PopularProductsAgent } from './popular-products-agent.js';
+import type { AgentContext, ParsedIntent, UserContext } from './types.js';
 
 const GREETINGS = [
   'hi',
@@ -27,6 +12,174 @@ const GREETINGS = [
   'hola',
   'sup',
 ];
+
+const BRANDS: Array<{ name: string; category?: string }> = [
+  { name: 'Samsung', category: 'Mobiles' },
+  { name: 'Xiaomi', category: 'Mobiles' },
+  { name: 'OnePlus', category: 'Mobiles' },
+  { name: 'Motorola', category: 'Mobiles' },
+  { name: 'Vivo', category: 'Mobiles' },
+  { name: 'Oppo', category: 'Mobiles' },
+  { name: 'Realme', category: 'Mobiles' },
+  { name: 'Redmi', category: 'Mobiles' },
+  { name: 'Apple' },
+  { name: 'Sony' },
+  { name: 'Dell', category: 'Laptops' },
+  { name: 'HP', category: 'Laptops' },
+  { name: 'Lenovo', category: 'Laptops' },
+  { name: 'Asus', category: 'Laptops' },
+];
+
+const DEFAULT_GEMINI_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3-flash-preview',
+  'gemini-flash-latest',
+  'gemini-2.0-flash',
+];
+
+const GEMINI_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedGeminiModels: { models: string[]; expiresAt: number } | null = null;
+
+const NON_TEXT_MODEL_PATTERN =
+  /(?:tts|image|lyria|robotics|deep-research|nano-banana|computer-use|antigravity)/i;
+
+const ROUTER_MODEL_PATTERN = /^gemini-(?:\d+(?:\.\d+)?-)?flash(?:-|$)/i;
+
+export interface GeminiAvailability {
+  available: boolean;
+  model?: string;
+  checkedModels: string[];
+  availableModels?: string[];
+  modelErrors?: Record<string, string>;
+  error?: string;
+}
+
+function getConfiguredGeminiModels(): string[] {
+  return [process.env.GEMINI_MODEL, ...DEFAULT_GEMINI_MODELS]
+    .filter((model): model is string => Boolean(model))
+    .filter((model, index, models) => models.indexOf(model) === index);
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Unknown Gemini API error';
+}
+
+async function discoverGeminiModels(apiKey: string): Promise<string[]> {
+  if (cachedGeminiModels && cachedGeminiModels.expiresAt > Date.now()) {
+    return cachedGeminiModels.models;
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Gemini model discovery failed with HTTP ${response.status}`,
+    );
+  }
+
+  const data = (await response.json()) as {
+    models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
+  };
+  const models = (data.models ?? [])
+    .filter((model) =>
+      model.supportedGenerationMethods?.includes('generateContent'),
+    )
+    .map((model) => model.name?.replace(/^models\//, ''))
+    .filter((model): model is string => Boolean(model))
+    .filter(
+      (model) =>
+        !NON_TEXT_MODEL_PATTERN.test(model) && ROUTER_MODEL_PATTERN.test(model),
+    );
+
+  cachedGeminiModels = {
+    models,
+    expiresAt: Date.now() + GEMINI_MODELS_CACHE_TTL_MS,
+  };
+  return models;
+}
+
+async function getGeminiModels(apiKey: string): Promise<string[]> {
+  const configuredModels = getConfiguredGeminiModels();
+  try {
+    const availableModels = await discoverGeminiModels(apiKey);
+    const preferredAvailableModels = configuredModels.filter((model) =>
+      availableModels.includes(model),
+    );
+    return [...preferredAvailableModels, ...availableModels].filter(
+      (model, index, models) => models.indexOf(model) === index,
+    );
+  } catch (error) {
+    console.warn('[RouterAgent] Gemini model discovery failed:', error);
+    return configuredModels;
+  }
+}
+
+export async function checkGeminiAvailability(): Promise<GeminiAvailability> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const configuredModels = getConfiguredGeminiModels();
+
+  if (!apiKey) {
+    return {
+      available: false,
+      checkedModels: configuredModels,
+      error: 'GEMINI_API_KEY is not configured',
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+  let availableModels: string[] | undefined;
+  let checkedModels = configuredModels;
+  try {
+    availableModels = await discoverGeminiModels(apiKey);
+    checkedModels = await getGeminiModels(apiKey);
+  } catch (error) {
+    return {
+      available: false,
+      checkedModels,
+      error: getErrorMessage(error),
+    };
+  }
+  let lastError = 'No configured Gemini model responded';
+  const modelErrors: Record<string, string> = {};
+
+  for (const model of checkedModels) {
+    try {
+      await ai.models.generateContent({
+        model,
+        contents: 'Return a JSON object confirming availability.',
+        config: {
+          maxOutputTokens: 16,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              available: { type: Type.BOOLEAN },
+            },
+          },
+        },
+      });
+      return {
+        available: true,
+        model,
+        checkedModels,
+        availableModels,
+        modelErrors,
+      };
+    } catch (error) {
+      lastError = getErrorMessage(error);
+      modelErrors[model] = lastError;
+    }
+  }
+
+  return {
+    available: false,
+    checkedModels,
+    availableModels,
+    modelErrors,
+    error: lastError,
+  };
+}
 
 function localFallbackParse(message: string): ParsedIntent {
   const lower = message.trim().toLowerCase();
@@ -250,7 +403,14 @@ function localFallbackParse(message: string): ParsedIntent {
   let minPrice: number | undefined;
   let maxPrice: number | undefined;
   let sortByPrice: 'asc' | 'desc' | undefined;
-  let brands: string[] | undefined;
+  let brands: string[] | undefined = BRANDS.filter((brand) =>
+    new RegExp(`\\b${brand.name.toLowerCase()}\\b`).test(lower),
+  ).map((brand) => brand.name);
+  if (brands.length === 0) brands = undefined;
+
+  if (!category && brands?.length === 1) {
+    category = BRANDS.find((brand) => brand.name === brands?.[0])?.category;
+  }
 
   if (
     lower.includes('premium') ||
@@ -367,6 +527,9 @@ function localFallbackParse(message: string): ParsedIntent {
       const extracted = intentMatch[1].trim();
       // Only use as keyword if it's specific enough (not just a generic category)
       const genericTerms = [
+        'product',
+        'products',
+        'anything',
         'mobile',
         'mobiles',
         'phone',
@@ -427,17 +590,19 @@ async function classifyIntent(
     return localFallbackParse(message);
   }
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey });
+  const models = await getGeminiModels(apiKey);
 
-    // Build conversation context from history
-    const historyContext = history?.length
-      ? `\nConversation so far:\n${history.map((h) => `${h.role}: ${h.content}`).join('\n')}\n`
-      : '';
+  // Build conversation context from history
+  const historyContext = history?.length
+    ? `\nConversation so far:\n${history.map((h) => `${h.role}: ${h.content}`).join('\n')}\n`
+    : '';
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: `${systemContext}
+  for (const model of models) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: `${systemContext}
 ${historyContext}
 User message: "${message}"
 
@@ -476,6 +641,12 @@ Analyze intent: greeting, orders, address, product_search, bundle_advisor, top_p
   * sortByPrice: "asc" for cheapest first, "desc" for most expensive first
   * sortByRating: true when user asks for "best rated", "top rated", "highest rated", "best reviews" products
 
+  IMPORTANT clarification rule: if the message only gives a budget (for example, "show me products under 30k", "anything below 30000", or "suggest something affordable") and does not include a category, product keyword, brand, persona, or use case:
+  - classify as product_search
+  - extract minPrice/maxPrice correctly
+  - set category and keyword to null
+  - do not infer a category or interest
+
   IMPORTANT price tier rules for Indian electronics market:
   - "premium", "flagship", "high-end", "luxury", "top" → set minPrice high (Mobiles: 60000, Laptops: 80000, Audio: 15000, Cameras: 50000), sortByPrice: "desc", brands: top-tier brands
   - "budget", "cheap", "affordable", "value for money", "economical" → set maxPrice low (Mobiles: 25000, Laptops: 50000, Audio: 5000, Cameras: 30000), sortByPrice: "asc"
@@ -485,85 +656,49 @@ Analyze intent: greeting, orders, address, product_search, bundle_advisor, top_p
 - For unknown: ask a helpful clarifying question.
 
 Always write a natural, friendly conversational reply.`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            isGreeting: { type: Type.BOOLEAN },
-            intent: { type: Type.STRING },
-            category: { type: Type.STRING, nullable: true },
-            maxPrice: { type: Type.NUMBER, nullable: true },
-            minPrice: { type: Type.NUMBER, nullable: true },
-            keyword: { type: Type.STRING, nullable: true },
-            brands: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              nullable: true,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              isGreeting: { type: Type.BOOLEAN },
+              intent: { type: Type.STRING },
+              category: { type: Type.STRING, nullable: true },
+              maxPrice: { type: Type.NUMBER, nullable: true },
+              minPrice: { type: Type.NUMBER, nullable: true },
+              keyword: { type: Type.STRING, nullable: true },
+              brands: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                nullable: true,
+              },
+              sortByPrice: {
+                type: Type.STRING,
+                nullable: true,
+                description: '"asc" or "desc"',
+              },
+              sortByRating: {
+                type: Type.BOOLEAN,
+                nullable: true,
+                description: 'true when user wants best/top rated products',
+              },
+              reply: { type: Type.STRING, description: 'Conversational reply' },
             },
-            sortByPrice: {
-              type: Type.STRING,
-              nullable: true,
-              description: '"asc" or "desc"',
-            },
-            sortByRating: {
-              type: Type.BOOLEAN,
-              nullable: true,
-              description: 'true when user wants best/top rated products',
-            },
-            reply: { type: Type.STRING, description: 'Conversational reply' },
           },
         },
-      },
-    });
-    return JSON.parse(response.text || '{}');
-  } catch (error) {
-    console.warn('Gemini API failed, falling back:', error);
-    return localFallbackParse(message);
+      });
+      return JSON.parse(response.text || '{}');
+    } catch (error) {
+      console.warn(`[RouterAgent] Gemini model ${model} failed:`, error);
+    }
   }
+
+  return localFallbackParse(message);
 }
 
-const ORDER_INTENTS = ['orders', 'order', 'order_history', 'order_status'];
-
 export class RouterAgent {
-  private agents: Record<string, Agent>;
-
-  constructor() {
-    this.agents = {
-      greeting: new GreetingAgent(),
-      product_search: new ProductSearchAgent(),
-      orders: new OrdersAgent(),
-      order: new OrdersAgent(),
-      order_history: new OrdersAgent(),
-      order_status: new OrdersAgent(),
-      address: new AddressAgent(),
-      top_picks: new TopPicksAgent(),
-      popular_products: new PopularProductsAgent(),
-      add_to_cart: new AddToCartAgent(),
-      bundle_advisor: new BundleAdvisorAgent(),
-      unknown: new UnknownAgent(),
-    };
-  }
-
-  async execute(ctx: AgentContext): Promise<AgentResponse> {
+  async classifyIntent(ctx: AgentContext): Promise<ParsedIntent> {
     const systemContext = buildSystemContext(ctx.userId, ctx.userContext);
-    const parsed = await classifyIntent(
-      ctx.message,
-      systemContext,
-      ctx.history,
-    );
-
-    const intentKey =
-      parsed.isGreeting || parsed.intent === 'greeting'
-        ? 'greeting'
-        : parsed.intent || 'unknown';
-
-    const agent = this.agents[intentKey] || this.agents['unknown'];
-
-    console.log(
-      `[RouterAgent] Intent: "${intentKey}" → Dispatching to ${agent.name}`,
-    );
-
-    return agent.execute(ctx, parsed);
+    return classifyIntent(ctx.message, systemContext, ctx.history);
   }
 }

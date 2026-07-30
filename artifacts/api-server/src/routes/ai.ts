@@ -1,10 +1,19 @@
 import { Router } from 'express';
-import { RouterAgent, loadUserContext } from '../agents/index.js';
+import {
+  checkGeminiAvailability,
+  SupervisorAgent,
+  loadUserContext,
+} from '../agents/index.js';
 import { compareProducts, recommendProduct } from '../agents/compare-agent.js';
 
 export const aiRouter = Router();
 
-const routerAgent = new RouterAgent();
+const supervisorAgent = new SupervisorAgent();
+
+aiRouter.get('/status', async (_req, res) => {
+  const gemini = await checkGeminiAvailability();
+  return res.status(gemini.available ? 200 : 503).json({ gemini });
+});
 
 aiRouter.post('/chat', async (req, res) => {
   const { message, history } = req.body;
@@ -18,7 +27,7 @@ aiRouter.post('/chat', async (req, res) => {
   try {
     const userContext = await loadUserContext(userId);
 
-    const response = await routerAgent.execute({
+    const response = await supervisorAgent.execute({
       message,
       userId,
       userContext,

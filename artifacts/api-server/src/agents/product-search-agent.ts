@@ -15,6 +15,10 @@ import type {
   AgentResponse,
   ParsedIntent,
 } from './types.js';
+import {
+  createProductSearchClarification,
+  needsProductSearchClarification,
+} from './clarification-policy.js';
 
 export class ProductSearchAgent implements Agent {
   name = 'ProductSearchAgent';
@@ -23,6 +27,10 @@ export class ProductSearchAgent implements Agent {
     ctx: AgentContext,
     parsed: ParsedIntent,
   ): Promise<AgentResponse> {
+    if (needsProductSearchClarification(ctx, parsed)) {
+      return createProductSearchClarification(ctx, parsed);
+    }
+
     const { userContext, userId } = ctx;
     const name = userContext.name ? `, ${userContext.name}` : '';
 
