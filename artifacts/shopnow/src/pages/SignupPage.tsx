@@ -53,7 +53,10 @@ export default function SignupPage() {
     registerMutation.mutate(
       { data: { name, email, password } },
       {
-        onSuccess: async () => {
+        onSuccess: async (data: any) => {
+          if (data?.token || data?.id) {
+            localStorage.setItem('shopnow_auth_token', String(data.token || data.id));
+          }
           await refreshUser();
           setLocation("/");
         },
