@@ -15,7 +15,17 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const isCloudDb =
+  process.env.NODE_ENV === "production" ||
+  process.env.DATABASE_URL.includes("supabase") ||
+  process.env.DATABASE_URL.includes("neon") ||
+  process.env.DATABASE_URL.includes("render") ||
+  process.env.DATABASE_URL.includes("sslmode=");
+
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ...(isCloudDb ? { ssl: { rejectUnauthorized: false } } : {}),
+});
 export const db = drizzle(pool, { schema });
 
 export * from "./schema/index.js";
