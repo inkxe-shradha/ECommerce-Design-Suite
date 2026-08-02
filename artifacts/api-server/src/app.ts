@@ -49,6 +49,7 @@ app.use(
     res.status(500).json({
       error: "Internal Server Error",
       message: err?.message || "An unexpected error occurred",
+      cause: err?.cause?.message || (err?.cause ? String(err.cause) : undefined),
     });
   },
 );
