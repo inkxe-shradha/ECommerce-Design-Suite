@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "ShopNow Electronics"
+version = "1.0.0"
+id = "artifacts/shopnow"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20991
+
+[services.development]
+run = "pnpm --filter @workspace/shopnow run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/shopnow", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/shopnow/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20991"
+BASE_PATH = "/"

@@ -1,0 +1,963 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: ShopNow Electronics API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: products
+    description: Product catalog
+  - name: recommendations
+    description: AI-powered recommendation widgets
+  - name: cart
+    description: Shopping cart
+  - name: auth
+    description: User authentication and account management
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "200":
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Validation error or email already exists
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current session
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMessage"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get currently authenticated user profile
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List products with optional filters
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: featured
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/deals:
+    get:
+      operationId: listDeals
+      tags: [products]
+      summary: Top deals with time-limited discounts
+      responses:
+        "200":
+          description: List of deal products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/search:
+    get:
+      operationId: searchProducts
+      tags: [products]
+      summary: Search products with text query and filters
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Text search query (matches name, brand, category)
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: department
+          in: query
+          schema:
+            type: string
+          description: "Filter by department, e.g. Gaming"
+        - name: componentType
+          in: query
+          schema:
+            type: string
+          description: "Filter by component type, e.g. Processor"
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: inStock
+          in: query
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [relevance, price_asc, price_desc, rating, newest]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Search results with pagination
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSearchResult"
+
+  /products/categories:
+    get:
+      operationId: getCategories
+      tags: [products]
+      summary: Get all product categories with counts
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryInfo"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get product detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+
+  /recommendations/homepage:
+    get:
+      operationId: getHomepageRecommendations
+      tags: [recommendations]
+      summary: All three recommendation widget types for homepage
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Recommendation widgets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomepageRecommendations"
+
+  /recommendations/pdp/{productId}:
+    get:
+      operationId: getPdpRecommendations
+      tags: [recommendations]
+      summary: PDP recommendation widgets (frequently bought together, content-based, hybrid)
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDP recommendation widgets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PdpRecommendations"
+
+  /recommendations/cart:
+    get:
+      operationId: getCartRecommendations
+      tags: [recommendations]
+      summary: Cart-based cross-sell recommendations
+      responses:
+        "200":
+          description: Cart recommendation widgets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartRecommendations"
+
+  /cart:
+    get:
+      operationId: getCart
+      tags: [cart]
+      summary: Get current session cart
+      responses:
+        "200":
+          description: Cart with items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /cart/items:
+    post:
+      operationId: addToCart
+      tags: [cart]
+      summary: Add a product to cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartItemInput"
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /cart/items/{productId}:
+    patch:
+      operationId: updateCartItem
+      tags: [cart]
+      summary: Update quantity of a cart item
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CartItemUpdate"
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+    delete:
+      operationId: removeFromCart
+      tags: [cart]
+      summary: Remove item from cart
+      parameters:
+        - name: productId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /checkout:
+    post:
+      operationId: processCheckout
+      tags: [checkout]
+      summary: Process checkout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "200":
+          description: Order successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderSuccess"
+
+  /orders:
+    get:
+      operationId: getOrders
+      tags: [orders]
+      summary: Get user order history
+      responses:
+        "200":
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+
+  /ai/chat:
+    post:
+      operationId: aiChat
+      tags: [ai]
+      summary: Send a message to the AI Chatbot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AIChatInput"
+      responses:
+        "200":
+          description: AI Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AIChatResponse"
+
+  /cart/coupon:
+    post:
+      operationId: applyCoupon
+      tags: [cart]
+      summary: Apply or validate a coupon against the current cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [couponCode]
+              properties:
+                couponCode:
+                  type: string
+      responses:
+        "200":
+          description: Updated cart with coupon applied or rejection reason
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+    delete:
+      operationId: removeCoupon
+      tags: [cart]
+      summary: Remove any applied coupon from the cart
+      responses:
+        "200":
+          description: Updated cart without coupon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /coupons/validate:
+    get:
+      operationId: validateCoupon
+      tags: [cart]
+      summary: Validate a coupon code against a cart total and return eligibility info
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: cartTotal
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Coupon validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponValidateResponse"
+
+  /gaming/build:
+    post:
+      operationId: buildGamingPc
+      tags: [gaming]
+      summary: Build a compatible gaming PC recommendation from a brief
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuildBriefInput"
+      responses:
+        "200":
+          description: Compatible gaming PC build result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildResult"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - brand
+        - price
+        - category
+        - imageUrl
+        - rating
+        - reviewCount
+        - inStock
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        brand:
+          type: string
+        price:
+          type: number
+        originalPrice:
+          type: ["number", "null"]
+        discountPct:
+          type: ["integer", "null"]
+        category:
+          type: string
+        department:
+          type: ["string", "null"]
+        componentType:
+          type: ["string", "null"]
+        externalId:
+          type: ["string", "null"]
+        sourceUrl:
+          type: ["string", "null"]
+        imageUrl:
+          type: string
+        images:
+          type: ["string", "null"]
+          description: "JSON array of image URLs"
+        rating:
+          type: number
+        reviewCount:
+          type: integer
+        inStock:
+          type: boolean
+        stockCount:
+          type: ["integer", "null"]
+        specs:
+          type: ["string", "null"]
+          description: "JSON object of product specifications"
+        isFeatured:
+          type: boolean
+        isDeal:
+          type: boolean
+
+    RecommendationWidget:
+      type: object
+      required:
+        - type
+        - title
+        - subtitle
+        - products
+      properties:
+        type:
+          type: string
+          enum: [content_based, collaborative, hybrid]
+        title:
+          type: string
+        subtitle:
+          type: string
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecommendedProduct"
+
+    RecommendedProduct:
+      type: object
+      required:
+        - product
+        - reason
+      properties:
+        product:
+          $ref: "#/components/schemas/Product"
+        reason:
+          type: string
+
+    HomepageRecommendations:
+      type: object
+      required:
+        - contentBased
+        - collaborative
+        - hybrid
+      properties:
+        contentBased:
+          $ref: "#/components/schemas/RecommendationWidget"
+        collaborative:
+          $ref: "#/components/schemas/RecommendationWidget"
+        hybrid:
+          $ref: "#/components/schemas/RecommendationWidget"
+
+    PdpRecommendations:
+      type: object
+      required:
+        - frequentlyBoughtTogether
+        - contentBased
+        - hybrid
+      properties:
+        frequentlyBoughtTogether:
+          $ref: "#/components/schemas/RecommendationWidget"
+        contentBased:
+          $ref: "#/components/schemas/RecommendationWidget"
+        hybrid:
+          $ref: "#/components/schemas/RecommendationWidget"
+
+    CartRecommendations:
+      type: object
+      required:
+        - crossSell
+        - collaborative
+        - hybrid
+      properties:
+        crossSell:
+          $ref: "#/components/schemas/RecommendationWidget"
+        collaborative:
+          $ref: "#/components/schemas/RecommendationWidget"
+        hybrid:
+          $ref: "#/components/schemas/RecommendationWidget"
+
+    CartItem:
+      type: object
+      required:
+        - product
+        - quantity
+      properties:
+        product:
+          $ref: "#/components/schemas/Product"
+        quantity:
+          type: integer
+
+    Cart:
+      type: object
+      required:
+        - items
+        - subtotal
+        - discount
+        - deliveryFee
+        - total
+        - couponApplied
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+        subtotal:
+          type: number
+        productDiscountAmount:
+          type: number
+        discount:
+          type: number
+        deliveryFee:
+          type: number
+        total:
+          type: number
+        couponApplied:
+          type: ["string", "null"]
+        couponInfo:
+          $ref: "#/components/schemas/AppliedCouponInfo"
+
+    CartItemInput:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+
+    CartItemUpdate:
+      type: object
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+
+    RegisterInput:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+
+    LoginInput:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    AuthMessage:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+
+    CheckoutInput:
+      type: object
+      required:
+        - address
+        - payment
+      properties:
+        address:
+          type: object
+          properties:
+            name: { type: string }
+            street: { type: string }
+            city: { type: string }
+            zip: { type: string }
+        payment:
+          type: object
+          properties:
+            cardNumber: { type: string }
+            expiry: { type: string }
+            cvv: { type: string }
+        couponCode:
+          type: string
+          description: "Optional coupon code to apply at checkout"
+
+    OrderSuccess:
+      type: object
+      required:
+        - message
+        - orderId
+      properties:
+        message:
+          type: string
+        orderId:
+          type: integer
+
+    Order:
+      type: object
+      required:
+        - id
+        - totalAmount
+        - status
+        - createdAt
+      properties:
+        id:
+          type: integer
+        totalAmount:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+        shippingAddress:
+          type: object
+          additionalProperties: true
+        paymentDetails:
+          type: object
+          additionalProperties: true
+
+    AIChatInput:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              role: { type: string }
+              content: { type: string }
+
+    AIChatResponse:
+      type: object
+      required:
+        - response
+      properties:
+        response:
+          type: string
+
+    ProductSearchResult:
+      type: object
+      required:
+        - products
+        - total
+        - page
+        - totalPages
+      properties:
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+
+    CategoryInfo:
+      type: object
+      required:
+        - name
+        - count
+      properties:
+        name:
+          type: string
+        count:
+          type: integer
+        subcategories:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              count: { type: integer }
+
+    AppliedCouponInfo:
+      type: object
+      properties:
+        code:
+          type: string
+        campaignName:
+          type: string
+        discountType:
+          type: string
+          enum: [percent, fixed]
+        discountValue:
+          type: number
+        appliedDiscount:
+          type: number
+        eligibleSubtotal:
+          type: number
+        rejectionReason:
+          type: ["string", "null"]
+
+    CouponValidateResponse:
+      type: object
+      required:
+        - valid
+        - code
+      properties:
+        valid:
+          type: boolean
+        code:
+          type: string
+        couponInfo:
+          $ref: "#/components/schemas/AppliedCouponInfo"
+        message:
+          type: string
+
+    BuildBriefInput:
+      type: object
+      required:
+        - budget
+        - workload
+        - targetDisplay
+      properties:
+        budget:
+          type: integer
+          description: "Total budget in INR"
+        workload:
+          type: string
+          enum: [gaming, streaming, creator, workstation]
+        targetDisplay:
+          type: string
+          enum: [1080p60, 1080p144, 1440p144, 4k60]
+        needsStreaming:
+          type: boolean
+          default: false
+        includePeripherals:
+          type: boolean
+          default: false
+        cpuBrand:
+          type: ["string", "null"]
+          enum: [AMD, Intel, null]
+        gpuBrand:
+          type: ["string", "null"]
+          enum: [AMD, Nvidia, null]
+
+    BuildResultComponent:
+      type: object
+      required:
+        - componentKey
+        - product
+        - reason
+      properties:
+        componentKey:
+          type: string
+        product:
+          $ref: "#/components/schemas/Product"
+        reason:
+          type: string
+
+    BuildResult:
+      type: object
+      required:
+        - isComplete
+        - components
+        - totalPrice
+        - compatibilityErrors
+        - budgetRemaining
+      properties:
+        isComplete:
+          type: boolean
+        partialNote:
+          type: ["string", "null"]
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/BuildResultComponent"
+        totalPrice:
+          type: number
+        estimatedPowerDraw:
+          type: number
+        compatibilityErrors:
+          type: array
+          items:
+            type: string
+        budgetRemaining:
+          type: number
