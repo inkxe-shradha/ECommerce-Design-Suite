@@ -66,16 +66,18 @@ Here is where the key components of the application reside:
     - `checkout.ts` — Transactional checkout, final quote calculation, order snapshots, and coupon redemption (`/api/checkout`)
     - `coupons.ts` — Coupon validation and active campaign discovery (`/api/coupons/*`)
     - `gaming.ts` — Deterministic Gaming PC build recommendations (`/api/gaming/build`)
-    - `orders.ts` — User order history & order details (`/api/orders/*`)
+    - `orders.ts` — User order history (`GET /api/orders`) & single order details (`GET /api/orders/:id`)
     - `reviews.ts` — Product ratings & customer review submission (`/api/reviews/*`)
     - `recommendations.ts` — AI/Rule recommendation engines for Homepage, PDP, and Cart (`/api/recommendations/*`)
     - `ai.ts` — E-Commerce assistant AI chatbot endpoint (`/api/ai/chat`)
-    - `agents/gaming-build-advisor-agent.ts` — Guided multi-turn Gaming PC build brief collection and explicit add-to-cart confirmation
+    - `agents/guided-product-advisor-agent.ts` — 3-Phase Multi-Turn Guided Consultation Engine for Mobiles, Laptops, Audio, Cameras, Accessories
+    - `agents/gaming-build-advisor-agent.ts` — Guided multi-turn Gaming PC build brief collection, brand chooser & inline coupon calculator
+    - `agents/supervisor-agent.ts` — Supervisor agent with fault-tolerant self-healing fallback and empathetic self-correction
     - `services/pricing.ts` — The single server-side authority for product and coupon quote calculations
     - `services/pc-builder.ts` — Deterministic component selection, budget allocation, and build-completeness gating
     - `health.ts` — Health check endpoint (`/api/healthz`)
 - **[`artifacts/shopnow`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/artifacts/shopnow)**: "ShopNow Electronics" — the main consumer-facing web application built on Vite, React 19, Tailwind CSS (v4), Radix UI primitives, Lucide icons, and Framer Motion.
-  - Features: Home, Search, Category views, Gaming component browsing, PDP with gallery & customer reviews, Cart/Checkout coupon entry and savings display, Order History, Auth Pages (Login/Signup), recommendation carousels, and an AI Chatbot widget (`AIChatbot.tsx`).
+  - Features: Home, Search, Category views, Gaming component browsing, PDP with gallery & customer reviews, Cart/Checkout coupon entry and savings display, Order History (`OrderHistoryPage.tsx`), Dedicated Order Invoice Page (`OrderDetailPage.tsx` at `/order/:id`), Auth Pages (Login/Signup), recommendation carousels, and an AI Chatbot widget (`AIChatbot.tsx`).
 - **[`artifacts/mockup-sandbox`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/artifacts/mockup-sandbox)**: An interactive development canvas environment allowing visual designers to preview UI components in isolation.
   - **[`mockupPreviewPlugin.ts`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/artifacts/mockup-sandbox/mockupPreviewPlugin.ts)**: Custom Vite plugin scanning `src/components/mockups/` on-the-fly and generating dynamic import manifests.
 
@@ -91,14 +93,13 @@ The contract synchronization workflow prevents API drift:
                       +------> [@workspace/api-client-react] --> (React Query Client Hooks)
 ```
 
-1.  **Contract Definition**: Endpoints, query parameters, request schemas, and response schemas are specified in [`openapi.yaml`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/lib/api-spec/openapi.yaml).
-2.  **Code Generation**: Running `pnpm --filter @workspace/api-spec run codegen` invokes Orval to produce:
+1. **Contract Definition**: Endpoints, query parameters, request schemas, and response schemas are specified in [`openapi.yaml`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/lib/api-spec/openapi.yaml).
+2. **Code Generation**: Running `pnpm --filter @workspace/api-spec run codegen` invokes Orval to produce:
     - Zod validation rules inside `lib/api-zod`.
     - React Query hooks inside `lib/api-client-react` with custom fetch logic (`custom-fetch.ts`).
-3.  **Contract Synchronization**:
+3. **Contract Synchronization**:
     - **Backend**: Server endpoints validate request bodies using generated Zod schemas (e.g. `AddToCartBody.safeParse(req.body)`).
     - **Frontend**: React components call type-safe query/mutation hooks (e.g. `useGetProducts`, `useAddToCart`, `useLogin`).
-    - **Rule**: API changes begin in `openapi.yaml`; regenerate both generated libraries before consuming newly added route fields or hooks.
 
 ---
 
@@ -130,10 +131,8 @@ Stores the catalog of products with pricing, stock, and promotional flags.
 - `imageUrl`, `images`: Primary asset link plus optional serialized gallery URL list
 - `rating`, `reviewCount`: Cached aggregate rating metrics
 - `inStock`, `stockCount`: Inventory counters
-- `specs`: Serialized JSON product specifications. Gaming imports retain supplier fields and normalize compatibility keys where available, including CPU socket, cooler sockets, RAM generation, GPU length, PSU wattage, radiator size, and storage interface.
+- `specs`: Serialized JSON product specifications.
 - `isFeatured`, `isDeal`: Operational flags for homepage promotions
-
-The catalog importer is [`lib/db/src/import-pc-components.ts`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/lib/db/src/import-pc-components.ts). It imports `pc_components_shopnow.json` through `externalId` upserts, maps its supplied component categories to the Gaming department, preserves INR price/stock data, and reports rejected source records.
 
 ### 3. Cart Items Table (`cart_items`)
 
@@ -157,69 +156,47 @@ Stores customer orders and historical line items.
 The promotion model is normalized so a campaign can target a department, component type, category, or individual product without changing the schema.
 
 - `coupons`: Campaign lifecycle, uppercase coupon code, `percent`/`fixed` discount definition, optional discount cap, minimum eligible subtotal, global/per-user redemption limits, auto-apply flag, priority, and timestamps.
-- `coupon_rules`: Include/exclude rules with `scopeType` of `department`, `componentType`, `category`, or `product`. A coupon with no include rule is catalog-wide subject to its other limits.
-- `coupon_redemptions`: Immutable coupon/order/user audit record with discount and eligible-subtotal snapshots. There is one redemption per order.
-
-### 6. Product Reviews Table (`reviews`)
-
-Stores verified customer reviews with rating constraints.
-
-- `id`: Primary key (serial)
-- `productId`: Foreign key to `products.id`
-- `userId`: Foreign key to `users.id`
-- `userName`: Author display name
-- `rating`: Rating score (1-5 integer)
-- `title`, `comment`: Review content
-- `createdAt`: Timestamp
-- Unique index on `(user_id, product_id)` ensures one review per user per product.
+- `coupon_rules`: Include/exclude rules with `scopeType` of `department`, `componentType`, `category`, or `product`.
+- `coupon_redemptions`: Immutable coupon/order/user audit record with discount and eligible-subtotal snapshots.
 
 ---
 
-## 5. Gaming Catalog and PC Builder
+## 5. Multi-Turn Guided Electronics Advisor & PC Builder
 
-Gaming is represented inside the existing `products` table rather than in a separate catalog. This retains current product, search, cart, and PDP behavior while adding hierarchical filtering for Gaming inventory.
+### Guided Product Advisor Flow (`guided-product-advisor-agent.ts`)
 
-### Catalog and Browse Flow
-
-1. The importer maps supplier categories to `department = Gaming` and a normalized `componentType`.
-2. `GET /api/products/search` accepts the existing filters plus `department` and `componentType`.
-3. `CategoryPage` treats `/category/Gaming` as a department view and provides component filters for processors, coolers, GPUs, RAM, storage, and PSUs.
-4. Existing category views continue to use the flat `category` field.
-
-### Guided Build Flow
-
-The chatbot uses `GamingBuildAdvisorAgent` for messages such as "build a gaming PC", "gaming rig", "PC build", or component-compatibility queries. It collects the smallest practical build brief over multiple turns:
-
-- Budget in INR
-- Workload: gaming, streaming, creator, or workstation
-- Target display: 1080p60, 1080p144, 1440p144, or 4k60
-- Optional streaming, CPU/GPU brand, form-factor, and peripheral preferences
-
-`pc-builder.ts` selects inventory deterministically using budget allocation, stock, component type, ratings, and available normalized specifications. It returns product IDs, rationale, estimated power draw, compatibility errors, and a budget remainder. The LLM may explain the result but must not override the compatibility service or price calculation.
+For queries like *"Help me to pick up best mobil"*, *"help me choose a phone"*, *"recommend a laptop"*, *"which headphones should I buy?"*, or out-of-catalog categories like *"Help me pick a good TV"* or *"I want a tablet"*:
 
 ```mermaid
 sequenceDiagram
     participant Customer
     participant Chatbot
-    participant BuildAgent as GamingBuildAdvisorAgent
-    participant Builder as pc-builder.ts
-    participant Catalog as PostgreSQL products
-    participant Cart
+    participant Advisor as GuidedProductAdvisorAgent
+    participant DB as PostgreSQL
 
-    Customer->>Chatbot: Build me a gaming PC
-    Chatbot->>BuildAgent: Message and conversation history
-    BuildAgent->>Customer: Ask only for missing build inputs
-    BuildAgent->>Builder: Normalized build brief
-    Builder->>Catalog: Query in-stock Gaming components
-    Builder-->>BuildAgent: Build result and compatibility status
-    BuildAgent->>Customer: One recommended build and explicit confirmation
-    Customer->>BuildAgent: Yes, add to cart
-    BuildAgent->>Cart: Add the selected component lines
+    Customer->>Chatbot: "Help me to pick up best mobil"
+    Chatbot->>Advisor: Step 1 (Identify category = Mobiles)
+    Advisor-->>Customer: "📱 What is your primary use case?" + Chips ["📷 Photography", "🎮 Gaming", "🔋 Battery"]
+    Customer->>Chatbot: "📷 Photography & Vlogging"
+    Chatbot->>Advisor: Step 2 (Preserve Mobiles + Use-Case)
+    Advisor-->>Customer: "💰 What is your target budget?" + Chips ["Under ₹15k", "₹15k-₹30k", "₹30k-₹60k"]
+    Customer->>Chatbot: "₹30,000 - ₹60,000"
+    Chatbot->>Advisor: Step 3 (Query DB for top rated phones)
+    Advisor->>DB: Fetch matching Mobiles in budget
+    Advisor-->>Customer: #1 Best Match (Galaxy S21 Variant) + Rationale + Top Alternatives + Action Chips
 ```
 
-### Completeness & Full 8-Component Rig Engine
+### Full 8-Component Human Store Advisor PC Builder (`gaming-build-advisor-agent.ts` & `pc-builder.ts`)
 
-The importer maps supplier categories from `pc_components_shopnow.json` into `department = Gaming` and a normalized `componentType`. The catalog now contains **404 Motherboards** and **629 Cases / Cabinets**, enabling **Full 8-Component Build Mode** (`isComplete: true`) across all gaming builds:
+The PC Builder acts as a human store advisor, taking users through a 5-step consultation flow:
+
+1. 💰 **Budget**: ₹60,000, ₹1,00,000, 1.5 lakh, ₹2,50,000, ₹3,00,000.
+2. 🎯 **Use Case**: Pure Gaming & Esports, Content Creation, Streaming, Heavy Workstation.
+3. 🔵🔴 **CPU Brand**: Intel, AMD Ryzen, or "Let AI decide".
+4. 🟢🔴 **GPU Brand**: Nvidia RTX, AMD Radeon, or "Let AI decide".
+5. 📺 **Monitor Resolution**: 1080p Esports, 1440p QHD, 4K Ultra, Multi-Monitor.
+
+Once complete, it builds a complete 8-component rig:
 
 1. ⚡ **Processor** (AMD Ryzen / Intel Core)
 2. 🔌 **Motherboard** (ASUS, MSI, Gigabyte, ASRock) — *404 items in stock*
@@ -230,69 +207,20 @@ The importer maps supplier categories from `pc_components_shopnow.json` into `de
 7. 📦 **Case / Cabinet** (Lian Li, Fractal Design, Ant Esports, NZXT) — *629 items in stock*
 8. ⚡ **Power Supply** (80+ Gold/Bronze SMPS)
 
-### Adaptive Self-Correction & Brand Customization Chooser
+---
 
-- **`self-correction-engine.ts`**: Intercepts user corrections and feedback (e.g. *"no I meant AMD GPU"*, *"budget is 1.5 lakh"*, *"wrong brand"*), categorizes correction types, and returns polite, empathetic self-correcting response prefixes.
-- **Stockpile Brand Chooser**: Dynamically queries in-stock brands across all 8 component stockpiles. When users request unstocked or future hardware (e.g. `"NVIDIA RTX 5090"`), the bot checks catalog inventory, lists available in-stock brands, and provides 1-tap brand discovery chips.
+## 6. Order Details & Tax Invoice System (`/order/:id`, `/orders/:id`)
+
+The dedicated Order Details page ([`OrderDetailPage.tsx`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/artifacts/shopnow/src/pages/OrderDetailPage.tsx)) provides:
+
+1. **Line-Item Product Snapshots**: High-resolution thumbnails, brand/category tags, line prices, unit price at purchase, and **1-tap "Buy Again" / Reorder button**.
+2. **Live Shipment Tracker**: 4-stage stepper tracking (`Order Placed` ➔ `Confirmed` ➔ `Shipped` ➔ `Delivered`).
+3. **Authoritative Financial Breakdown**: Displays Subtotal, Product Markdowns, **Applied Coupon Code Badge & Savings Snapshot**, Free Shipping, and Total Paid.
+4. **Printable Tax Invoice Modal**: 1-click **"Download Tax Invoice"** button generating a clean printable receipt (`#INV-5`) with full billing & address details.
 
 ---
 
-## 6. Pricing and Coupon Architecture
-
-`services/pricing.ts` is the pricing authority. Cart display, checkout, and chatbot responses must call it rather than duplicating discount math in frontend code or LLM prompts.
-
-### Quote Calculation
-
-`buildQuote(lines, userId, couponCode?)`:
-
-1. Enriches cart lines with authoritative product data.
-2. Calculates subtotal and product-level markdown savings independently.
-3. Resolves a manual coupon code or the best currently eligible auto-apply coupon.
-4. Applies include/exclude rules, date windows, eligible subtotal minimums, caps, and global/per-user redemption limits.
-5. Returns an itemized quote with either an applied coupon or a user-safe rejection reason.
-
-Coupon stacking is currently disabled. A manually entered valid coupon takes precedence over auto-apply selection.
-
-### Cart and Checkout Contract
-
-- `GET /api/cart` returns the server quote, including `couponApplied`, `couponInfo`, coupon discount, final total, and product discount snapshot values.
-- `POST /api/cart/coupon` selects a coupon for the current cart session; `DELETE /api/cart/coupon` clears it.
-- `GET /api/coupons/validate` previews a code; `GET /api/coupons/active` exposes active campaign metadata and eligibility rules for assistant/UI discovery.
-- `POST /api/checkout` re-reads cart lines and recalculates the quote server-side. It creates the order, order items, and coupon redemption record in one transaction, retaining the coupon snapshot with the order.
-
-This design fixes the previous failure mode where cart displayed a hardcoded discount while checkout charged the pre-discount total.
-
-```mermaid
-sequenceDiagram
-    participant CartUI as Cart / Chatbot
-    participant CartAPI as cart.ts
-    participant Pricing as pricing.ts
-    participant Checkout as checkout.ts
-    participant DB as PostgreSQL
-
-    CartUI->>CartAPI: Apply coupon or fetch cart
-    CartAPI->>Pricing: buildQuote(cart lines, user, code)
-    Pricing->>DB: Read products, coupons, rules, redemptions
-    Pricing-->>CartAPI: Itemized quote or rejection reason
-    CartAPI-->>CartUI: Server-calculated total and savings
-    CartUI->>Checkout: Checkout request
-    Checkout->>Pricing: Recalculate authoritative quote
-    Checkout->>DB: Create order, lines, coupon snapshot, redemption atomically
-```
-
----
-
-## 5. Mockup Sandbox Architecture
-
-The mockup sandbox is a developer preview utility:
-
-- **Dynamic Directory Scanning**: [`mockupPreviewPlugin.ts`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/artifacts/mockup-sandbox/mockupPreviewPlugin.ts) watches `src/components/mockups/`.
-- **Manifest Generation**: Generates `src/.generated/mockup-components.ts` mapping path slugs to dynamic imports.
-- **Isolated Component Rendering**: Displays design mockups in clean isolation for rapid UI design iterations.
-
----
-
-## 6. How to Run and Build the Workspace
+## 7. How to Run and Build the Workspace
 
 Always use **`pnpm`** as the monorepo package manager.
 
@@ -312,7 +240,7 @@ Always use **`pnpm`** as the monorepo package manager.
 
 ---
 
-## 7. Key Tech Stack Summary
+## 8. Key Tech Stack Summary
 
 - **Package Manager**: `pnpm` workspaces
 - **Language**: TypeScript `5.9`, Node.js `24`
@@ -321,16 +249,3 @@ Always use **`pnpm`** as the monorepo package manager.
 - **Input Validation**: Zod (`v4`)
 - **Code Generation**: Orval (OpenAPI to React-Query + Zod)
 - **Frontend Apps**: React `19`, Vite, TanStack React Query `v5`, Wouter routing, Tailwind CSS `v4`, Radix UI, Lucide React, Framer Motion
-
----
-
-## 8. Gaming and Coupon Release Checklist
-
-Before enabling Gaming PC builds and promotions in a deployed environment:
-
-1. Run `pnpm --filter @workspace/db run push` against the target PostgreSQL database.
-2. Run the Gaming catalog import (`import-pc-components.ts`) and verify that all 3,000+ gaming products (including 404 Motherboards and 629 Cases) are inserted/updated with active stock (`inStock: true`, `stockCount: 50`).
-3. Seed coupon campaigns (`seed-coupons.ts`) and verify active campaigns (`BUILD50K`, `GAMING10`, `CPU15`, `GPU5K`).
-4. Regenerate the OpenAPI Zod and React client packages after API-contract changes, then run `pnpm run typecheck`.
-5. Test cart and checkout totals with an eligible coupon, an ineligible coupon, and an expired or exhausted coupon. The displayed quote and stored order total must match.
-6. Verify full 8-component PC builds in the AI Chatbot widget (`/api/ai/chat`) to ensure all 8 core hardware components are recommended and brand chooser chips function as expected.

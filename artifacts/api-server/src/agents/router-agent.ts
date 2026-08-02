@@ -72,23 +72,148 @@ function localFallbackParse(
     return { isGreeting: true, intent: 'greeting', reply: '' };
   }
 
-  // Active Gaming PC build continuation
+  // Extract last assistant message for active continuation tracking
   const lastAssistantMsg = [...(history || [])]
     .reverse()
     .find((h) => h.role === 'assistant');
   const lastContentLower = (lastAssistantMsg?.content || '').toLowerCase();
+
+  // ── Active Guided Consultation continuation (checked FIRST before PC build) ──
+  const isGuidedAdvisorActive =
+    lastContentLower.includes('primary use case for your new') ||
+    lastContentLower.includes('target budget for your') ||
+    lastContentLower.includes('which product category are you looking for') ||
+    lastContentLower.includes('sound experience are you looking for') ||
+    lastContentLower.includes('photography will you primarily do') ||
+    lastContentLower.includes('electronics match') ||
+    lastContentLower.includes('best recommended mobile') ||
+    lastContentLower.includes('best recommended laptop') ||
+    lastContentLower.includes('best recommended audio') ||
+    lastContentLower.includes('best recommended camera') ||
+    lastContentLower.includes('best recommended tv') ||
+    lastContentLower.includes('best recommended tablet') ||
+    lastContentLower.includes('what will you primarily use your new tv') ||
+    lastContentLower.includes('what will you primarily use your new tablet') ||
+    lastContentLower.includes('what is your primary use case for your new');
+
+  if (isGuidedAdvisorActive) {
+    return { isGreeting: false, intent: 'guided_advisor', reply: '' };
+  }
+
+  // ── Active Gaming PC build continuation ──────────────────────────────────
   const isGamingBuildActive =
     lastContentLower.includes('gaming pc') ||
     lastContentLower.includes('pc build') ||
-    lastContentLower.includes('total budget') ||
-    lastContentLower.includes('display target') ||
-    lastContentLower.includes('primary use case') ||
+    lastContentLower.includes('primary workload') ||
+    lastContentLower.includes('what will you primarily use this pc') ||
+    lastContentLower.includes('processor brand preference') ||
+    lastContentLower.includes('graphics card (gpu) brand preference') ||
+    lastContentLower.includes('let ai decide') ||
+    lastContentLower.includes('target display') ||
+    lastContentLower.includes('target monitor resolution') ||
+    lastContentLower.includes('resolution goal') ||
+    (lastContentLower.includes('total target budget') &&
+      !lastContentLower.includes('for your new')) ||
     lastContentLower.includes('components selected') ||
-    lastContentLower.includes('ready to add') ||
+    lastContentLower.includes('component breakdown') ||
+    (lastContentLower.includes('ready to add') &&
+      lastContentLower.includes('components')) ||
     lastContentLower.includes('coupon savings');
 
   if (isGamingBuildActive) {
     return { isGreeting: false, intent: 'gaming_build', reply: '' };
+  }
+
+  // ── Compare intent fast-path ─────────────────────────────────────────────
+  if (
+    lower.includes(' vs ') ||
+    lower.includes(' versus ') ||
+    lower.startsWith('compare ') ||
+    (lower.includes('compare') && lower.includes(' and ')) ||
+    (lower.includes('difference between') && (lower.includes('and') || lower.includes('vs')))
+  ) {
+    return { isGreeting: false, intent: 'compare', reply: '' };
+  }
+
+  // ── Return/Refund/Exchange intent ────────────────────────────────────────
+  if (
+    lower.includes('return') ||
+    lower.includes('refund') ||
+    lower.includes('exchange') ||
+    lower.includes('cancel my order') ||
+    lower.includes('cancellation') ||
+    lower.includes('damaged') ||
+    lower.includes('wrong item') ||
+    lower.includes('replace my') ||
+    lower.includes('replacement')
+  ) {
+    return { isGreeting: false, intent: 'orders', reply: 'return' };
+  }
+
+  // ── Specific PC Build triggers override guided advisor ───────────────────
+  if (
+    lower.includes('pc build') ||
+    lower.includes('build a pc') ||
+    lower.includes('build pc') ||
+    lower.includes('gaming rig') ||
+    lower.includes('gaming pc') ||
+    lower.includes('assemble pc') ||
+    lower.includes('assemble a pc')
+  ) {
+    return { isGreeting: false, intent: 'gaming_build', reply: '' };
+  }
+
+  // ── Guided Product Advisor triggers ──────────────────────────────────────
+  const guidedAdvisorTriggers = [
+    'help me to pick',
+    'help me pick',
+    'help me choose',
+    'help me select',
+    'pick up best',
+    'pick best',
+    'choose best',
+    'which mobile',
+    'which phone',
+    'which laptop',
+    'which headphone',
+    'which camera',
+    'which tv',
+    'which tablet',
+    'recommend a mobile',
+    'recommend a phone',
+    'recommend a laptop',
+    'recommend a tv',
+    'suggest a mobile',
+    'suggest a phone',
+    'suggest a laptop',
+    'suggest a tv',
+    'guide me to buy',
+    'guide me to choose',
+    'what is the best mobile',
+    'what is the best phone',
+    'what is the best laptop',
+    'what is the best tv',
+    'best mobil',
+    'best mobile',
+    'best tv',
+    'best tablet',
+  ];
+  if (guidedAdvisorTriggers.some((t) => lower.includes(t))) {
+    return { isGreeting: false, intent: 'guided_advisor', reply: '' };
+  }
+
+  // ── Deals / Sale / Flash Sale intent ─────────────────────────────────────
+  if (
+    lower.includes('deals') ||
+    lower.includes('flash sale') ||
+    lower.includes('offer') ||
+    lower.includes('discount') ||
+    lower.includes("today's sale") ||
+    lower.includes('best offers') ||
+    lower.includes('sale today') ||
+    lower.includes('on sale')
+  ) {
+    return { isGreeting: false, intent: 'popular_products', reply: '' };
   }
 
   if (
@@ -105,8 +230,12 @@ function localFallbackParse(
     return { isGreeting: false, intent: 'add_to_cart', reply: '' };
   }
 
-  // Gaming PC build intent — checked before generic bundle triggers
+  // ── Gaming PC build intent ────────────────────────────────────────────────
   const gamingBuildTriggers = [
+    'pick a good pc build',
+    'help me to pick a good pc build',
+    'pick pc build',
+    'good pc build',
     'build gaming pc',
     'build a gaming pc',
     'build pc',
@@ -130,7 +259,7 @@ function localFallbackParse(
     return { isGreeting: false, intent: 'gaming_build', reply: '' };
   }
 
-  // Coupon intent
+  // ── Coupon intent ─────────────────────────────────────────────────────────
   if (
     lower.includes('coupon') ||
     lower.includes('promo code') ||
@@ -147,18 +276,17 @@ function localFallbackParse(
     };
   }
 
+  // ── Bundle advisor — persona-based (NOT triggered by "gaming" alone) ──────
   const bundleTriggers = [
     'student',
     'college',
     'university',
     'engineering',
-    'gamer',
-    'gaming setup',
-    'gaming',
+    'gaming setup',        // Must include "setup" — not "gaming" alone
+    'gaming workstation',  // specific gaming workspace persona
     'work from home',
     'professional',
     'office setup',
-    'office',
     'content creator',
     'youtuber',
     'vlogger',
@@ -175,7 +303,7 @@ function localFallbackParse(
     'musician',
     'music production',
     'photographer',
-    'photography',
+    'photography setup',   // must be specific to setup
     'freelancer',
     'freelance',
     'remote work',
@@ -187,7 +315,6 @@ function localFallbackParse(
     lower.includes('setup for') ||
     lower.includes('what should i') ||
     lower.includes('suggest for') ||
-    lower.includes('help me pick') ||
     lower.includes('complete setup') ||
     lower.includes('everything i need');
   if (
@@ -293,6 +420,7 @@ function localFallbackParse(
     return { isGreeting: false, intent: 'address', reply: '' };
   }
 
+  // ── Category / price detection for product_search ─────────────────────────
   let category: string | undefined;
   if (
     lower.includes('mobile') ||
@@ -331,6 +459,23 @@ function localFallbackParse(
     lower.includes('power bank')
   ) {
     category = 'Accessories';
+  } else if (
+    lower.includes(' tv') ||
+    lower.includes('smart tv') ||
+    lower.includes('television') ||
+    lower.includes('qled') ||
+    lower.includes('oled tv') ||
+    lower.includes('4k tv')
+  ) {
+    // TV intent → route to guided advisor for product discovery
+    return { isGreeting: false, intent: 'guided_advisor', reply: '' };
+  } else if (
+    lower.includes('tablet') ||
+    lower.includes('ipad') ||
+    lower.includes('android tablet')
+  ) {
+    // Tablet intent → route to guided advisor for product discovery
+    return { isGreeting: false, intent: 'guided_advisor', reply: '' };
   }
 
   let minPrice: number | undefined;
@@ -470,6 +615,9 @@ function localFallbackParse(
         'camera',
         'cameras',
         'accessories',
+        'tv',
+        'tablet',
+        'tablets',
       ];
       if (!genericTerms.includes(extracted) && extracted.length > 2) {
         keyword = extracted;
@@ -523,51 +671,41 @@ async function classifyIntent(
 ${historyContext}
 User message: "${message}"
 
-Analyze intent: greeting, orders, address, product_search, bundle_advisor, top_picks, popular_products, add_to_cart, gaming_build, or unknown.
+Analyze intent: greeting, orders, address, product_search, bundle_advisor, top_picks, popular_products, add_to_cart, gaming_build, compare, or unknown.
 - For greetings: write a warm personalised welcome using their name if available, mention their interests.
-- For orders: summarise their recent order history.
+- For orders: summarise their recent order history. If user mentions return/refund/exchange, still classify as orders.
 - For address: show/confirm their last shipping address.
 - For add_to_cart: ONLY when user explicitly says "add to cart". NOT when they say "I want to buy X" (that's product_search).
-- For popular_products: when user asks about "what's popular", "trending", "bestsellers", "most reviewed", "what should I buy" in a general sense (not category-specific).
-- For gaming_build: when user wants to BUILD or ASSEMBLE a gaming PC, mentions "gaming rig", "gaming build", "PC build", "build my PC", asks about compatible parts, "which processor/CPU/GPU should I pair with", or wants a complete gaming setup with desktop components.
+- For popular_products: when user asks about "what's popular", "trending", "bestsellers", "most reviewed", "deals", "flash sale", "offers", "on sale" in a general sense.
+- For compare: when user says "compare X vs Y", "X versus Y", "difference between X and Y". Extract both product names.
+- For gaming_build: when user wants to BUILD or ASSEMBLE a gaming PC, mentions "gaming rig", "gaming build", "PC build", "build my PC", asks about compatible parts.
   Example: "build me a gaming PC for 80k" → gaming_build
   Example: "I want to assemble a gaming rig" → gaming_build
-  Example: "help me pick parts for a gaming computer" → gaming_build
-  Example: "which CPU goes with RTX 4070?" → gaming_build
-- For bundle_advisor: when user mentions a PERSONA (student, professional, creator, work from home) AND wants recommendations/suggestions/a setup. NOT for gaming PC builds.
-- For product_search: extract category, maxPrice, minPrice, keyword, brands, sortByPrice, sortByRating as before.
+  IMPORTANT: "gaming" ALONE does NOT trigger gaming_build. "I want a gaming laptop" → product_search with category=Laptops.
+- For bundle_advisor: when user mentions a PERSONA (student, professional, creator, work from home) AND wants a complete setup/recommendations. NOT for gaming PC builds. NOT for "gaming" alone.
+- For product_search: extract category, maxPrice, minPrice, keyword, brands, sortByPrice, sortByRating.
   * category: one of Mobiles, Laptops, Accessories, Audio, Cameras
+  * TV / Smart TV queries → classify as guided_advisor intent (not product_search)
   * maxPrice: upper price limit in INR (number)
   * minPrice: lower price limit in INR (number)
-  * keyword: THE SPECIFIC product model or name the user is asking about. This is CRITICAL.
+  * keyword: THE SPECIFIC product model or name. CRITICAL.
     - "I want to buy Galaxy S22" → keyword: "Galaxy S22"
-    - "show me iPhone 15 Pro" → keyword: "iPhone 15 Pro"  
-    - "Samsung S24 Ultra" → keyword: "S24 Ultra"
+    - "show me iPhone 15 Pro" → keyword: "iPhone 15 Pro"
     - "MacBook Air M2" → keyword: "MacBook Air M2"
-    - "Sony WH-1000XM5" → keyword: "WH-1000XM5"
-    - "I want to build a gaming PC" → keyword: "gaming"
-    - "show me mobiles" → keyword: null (generic, no specific model)
-    IMPORTANT: If the user mentions a SPECIFIC model name/number, ALWAYS extract it as keyword. 
-    Do NOT leave keyword null when user is asking about a specific product.
-  * brands: array of brand names to filter by (e.g. ["Apple", "Samsung"])
+    - "show me mobiles" → keyword: null (generic)
+  * brands: array of brand names (e.g. ["Apple", "Samsung"])
     - Extract brand from context: "Galaxy S22" → brands: ["Samsung"]
-    - "iPhone" → brands: ["Apple"]
-    - "MacBook" → brands: ["Apple"]
   * sortByPrice: "asc" for cheapest first, "desc" for most expensive first
-  * sortByRating: true when user asks for "best rated", "top rated", "highest rated", "best reviews" products
+  * sortByRating: true when user asks for "best rated", "top rated", "highest rated"
 
-  IMPORTANT clarification rule: if the message only gives a budget (for example, "show me products under 30k", "anything below 30000", or "suggest something affordable") and does not include a category, product keyword, brand, persona, or use case:
-  - classify as product_search
-  - extract minPrice/maxPrice correctly
-  - set category and keyword to null
-  - do not infer a category or interest
+  IMPORTANT clarification rule: if message only gives budget with no category/brand/keyword:
+  - classify as product_search, extract price, set category/keyword null
 
-  IMPORTANT price tier rules for Indian electronics market:
-  - "premium", "flagship", "high-end", "luxury", "top" → set minPrice high (Mobiles: 60000, Laptops: 80000, Audio: 15000, Cameras: 50000), sortByPrice: "desc", brands: top-tier brands
-  - "budget", "cheap", "affordable", "value for money", "economical" → set maxPrice low (Mobiles: 25000, Laptops: 50000, Audio: 5000, Cameras: 30000), sortByPrice: "asc"
-  - "mid-range", "moderate" → set both minPrice and maxPrice (Mobiles: 25000-60000, Laptops: 50000-80000)
-  - If user mentions a specific brand like "Apple", "Samsung", "Sony", "Dell" etc, include it in brands array
-  
+  IMPORTANT price tier rules for Indian market:
+  - "premium", "flagship", "high-end" → set minPrice high, sortByPrice: "desc"
+  - "budget", "cheap", "affordable" → set maxPrice low, sortByPrice: "asc"
+  - "mid-range", "moderate" → set both minPrice and maxPrice
+
 - For unknown: ask a helpful clarifying question.
 
 Always write a natural, friendly conversational reply.`;
@@ -588,32 +726,29 @@ export class RouterAgent {
   async classifyIntent(ctx: AgentContext): Promise<ParsedIntent> {
     const systemContext = buildSystemContext(ctx.userId, ctx.userContext);
 
-    // Active Gaming PC build continuation check before LLM classification
-    const lastAssistantMsg = [...(ctx.history || [])]
-      .reverse()
-      .find((h) => h.role === 'assistant');
-    const lastContentLower = (lastAssistantMsg?.content || '').toLowerCase();
-    const isGamingBuildActive =
-      lastContentLower.includes('gaming pc') ||
-      lastContentLower.includes('pc build') ||
-      lastContentLower.includes('total budget') ||
-      lastContentLower.includes('display target') ||
-      lastContentLower.includes('primary use case') ||
-      lastContentLower.includes('components selected') ||
-      lastContentLower.includes('ready to add') ||
-      lastContentLower.includes('coupon savings');
-
-    const msgLower = ctx.message.toLowerCase();
-    const isTopicSwitch =
-      msgLower.includes('show me mobile') ||
-      msgLower.includes('show me laptop') ||
-      msgLower.includes('my orders') ||
-      msgLower.includes('my address');
-
-    if (isGamingBuildActive && !isTopicSwitch) {
-      return { isGreeting: false, intent: 'gaming_build', reply: '' };
+    // Fast deterministic local intent parse
+    const local = localFallbackParse(ctx.message, ctx.history);
+    if (
+      local.intent === 'guided_advisor' ||
+      local.intent === 'gaming_build' ||
+      local.intent === 'greeting' ||
+      local.intent === 'add_to_cart' ||
+      local.intent === 'orders' ||
+      local.intent === 'address' ||
+      local.intent === 'compare' ||
+      local.intent === 'popular_products'
+    ) {
+      return local;
     }
 
-    return classifyIntent(ctx.message, systemContext, ctx.history);
+    // Call LLM for open-ended product search / complex intent classification
+    const llmParsed = await classifyIntent(ctx.message, systemContext, ctx.history);
+
+    // If local detected guided advisor or gaming build triggers, override LLM
+    if (local.intent === 'guided_advisor' || local.intent === 'gaming_build') {
+      return local;
+    }
+
+    return llmParsed;
   }
 }

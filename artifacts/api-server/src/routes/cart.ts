@@ -205,6 +205,30 @@ router.delete("/cart/items/:productId", async (req, res): Promise<void> => {
   res.json(cart);
 });
 
+/** DELETE /cart/items — empty entire cart */
+router.delete("/cart/items", async (req, res): Promise<void> => {
+  const sessionId = getSessionId(req);
+  const userId = getUserId(req);
+  await db
+    .delete(cartItemsTable)
+    .where(eq(cartItemsTable.sessionId, sessionId));
+  clearSessionCoupon(sessionId);
+  const cart = await buildCartResponse(sessionId, userId);
+  res.json(cart);
+});
+
+/** DELETE /cart — empty entire cart */
+router.delete("/cart", async (req, res): Promise<void> => {
+  const sessionId = getSessionId(req);
+  const userId = getUserId(req);
+  await db
+    .delete(cartItemsTable)
+    .where(eq(cartItemsTable.sessionId, sessionId));
+  clearSessionCoupon(sessionId);
+  const cart = await buildCartResponse(sessionId, userId);
+  res.json(cart);
+});
+
 /** POST /cart/coupon — apply a coupon to the session */
 router.post("/cart/coupon", async (req, res): Promise<void> => {
   const sessionId = getSessionId(req);

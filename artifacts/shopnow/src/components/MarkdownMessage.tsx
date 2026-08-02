@@ -1,15 +1,18 @@
 import React, { memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Link } from 'wouter';
 
 interface MarkdownMessageProps {
   content: string;
   className?: string;
+  onLinkClick?: () => void;
 }
 
 export const MarkdownMessage = memo(function MarkdownMessage({
   content,
   className = '',
+  onLinkClick,
 }: MarkdownMessageProps) {
   return (
     <div
@@ -18,17 +21,30 @@ export const MarkdownMessage = memo(function MarkdownMessage({
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          // Keep links safe and styled
-          a: ({ href, children }) => (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-indigo-600 dark:text-indigo-400 underline hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
-            >
-              {children}
-            </a>
-          ),
+          // Render internal links with wouter Link, external links with target="_blank"
+          a: ({ href, children }) => {
+            if (href && href.startsWith('/')) {
+              return (
+                <Link
+                  href={href}
+                  onClick={onLinkClick}
+                  className="text-indigo-600 dark:text-indigo-400 font-semibold underline hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors inline-flex items-center gap-0.5"
+                >
+                  {children}
+                </Link>
+              );
+            }
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-indigo-600 dark:text-indigo-400 underline hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
+              >
+                {children}
+              </a>
+            );
+          },
           // Compact paragraphs for chat
           p: ({ children }) => (
             <p className="my-1 leading-relaxed">{children}</p>

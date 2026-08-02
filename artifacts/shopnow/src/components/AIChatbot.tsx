@@ -18,11 +18,13 @@ import {
   Minimize2,
   GitCompareArrows,
   Check,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import { useAddToCart, getGetCartQueryKey } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../context/UserContext';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { MarkdownMessage } from './MarkdownMessage';
 import {
   onProductImageError,
@@ -105,6 +107,7 @@ export function AIChatbot() {
   const { isLoggedIn, userName } = useUser();
   const queryClient = useQueryClient();
   const addToCart = useAddToCart();
+  const [, setLocation] = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const persisted = useRef(loadPersistedChat());
@@ -122,6 +125,60 @@ export function AIChatbot() {
     useState<CompareData | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Speech-to-Text (Voice Input) State & Web Speech API
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      setIsSpeechSupported(true);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-IN'; // Native support for Indian English dialect & tech numbers
+
+      recognition.onresult = (event: any) => {
+        let currentTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          currentTranscript += event.results[i][0].transcript;
+        }
+        setInput(currentTranscript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('[AIChatbot] Speech recognition error:', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error('[AIChatbot] Failed to start speech recognition:', err);
+      }
+    }
+  };
 
   // Persist chat to sessionStorage on change
   useEffect(() => {
@@ -161,6 +218,10 @@ export function AIChatbot() {
       return res.json();
     },
     onSuccess: (data) => {
+      // Invalidate and refetch cart cache immediately so UI header badge, cart drawer & cart page update in real-time
+      queryClient.invalidateQueries({ queryKey: getGetCartQueryKey() });
+      queryClient.refetchQueries({ queryKey: getGetCartQueryKey() });
+
       // Ensure orders are included even if backend intent detection missed
       let orders = data.orders;
       if ((!orders || orders.length === 0) && data.reply) {
@@ -360,6 +421,42 @@ export function AIChatbot() {
   };
 
   const handleQuickAction = (query: string) => {
+    const lower = query.toLowerCase().trim();
+
+    // Instant client-side navigation for action chips
+    if (
+      lower.includes('go to cart') ||
+      lower.includes('view cart') ||
+      lower === 'cart' ||
+      lower === 'open cart'
+    ) {
+      queryClient.invalidateQueries({ queryKey: getGetCartQueryKey() });
+      queryClient.refetchQueries({ queryKey: getGetCartQueryKey() });
+      setIsOpen(false);
+      setIsExpanded(false);
+      setLocation('/cart');
+      return;
+    }
+
+    if (
+      lower.includes('view all orders') ||
+      lower.includes('my orders') ||
+      lower.includes('view orders')
+    ) {
+      setIsOpen(false);
+      setIsExpanded(false);
+      setLocation('/orders');
+      return;
+    }
+
+    if (lower.includes('go to checkout') || lower.includes('checkout')) {
+      queryClient.invalidateQueries({ queryKey: getGetCartQueryKey() });
+      setIsOpen(false);
+      setIsExpanded(false);
+      setLocation('/checkout');
+      return;
+    }
+
     setMessages((prev) => [...prev, { role: 'user', text: query }]);
     chatMutation.mutate(query);
   };
@@ -596,7 +693,13 @@ export function AIChatbot() {
                             }`}
                           >
                             {msg.role === 'ai' ? (
-                              <MarkdownMessage content={msg.text} />
+                              <MarkdownMessage
+                                content={msg.text}
+                                onLinkClick={() => {
+                                  setIsOpen(false);
+                                  setIsExpanded(false);
+                                }}
+                              />
                             ) : (
                               msg.text
                             )}
@@ -1077,42 +1180,70 @@ export function AIChatbot() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={
-                      pendingRecommendContext
+                      isListening
+                        ? '🎤 Listening... Speak now!'
+                        : pendingRecommendContext
                         ? 'Type your answer…'
                         : compareProducts.length > 0
-                          ? `Compare ${compareProducts.length} product${compareProducts.length !== 1 ? 's' : ''}…`
-                          : isLoggedIn
-                            ? `Ask anything, ${displayName}…`
-                            : 'Ask for recommendations…'
+                        ? `Compare ${compareProducts.length} product${compareProducts.length !== 1 ? 's' : ''}…`
+                        : isLoggedIn
+                        ? `Ask anything, ${displayName}…`
+                        : 'Ask for recommendations…'
                     }
-                    className="w-full bg-neutral-100 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-full py-2 sm:py-2.5 lg:py-3 pl-3 sm:pl-4 pr-12 text-sm sm:text-sm lg:text-base text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`w-full bg-neutral-100 dark:bg-neutral-950 border rounded-full py-2 sm:py-2.5 lg:py-3 pl-3 sm:pl-4 ${
+                      isSpeechSupported ? 'pr-20' : 'pr-12'
+                    } text-sm sm:text-sm lg:text-base text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-500 dark:placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all ${
+                      isListening
+                        ? 'border-red-400 dark:border-red-600 ring-2 ring-red-400/50 dark:ring-red-600/50'
+                        : 'border-neutral-200 dark:border-neutral-800'
+                    }`}
                     disabled={chatMutation.isPending || compareLoading}
                   />
-                  <button
-                    type="submit"
-                    disabled={
-                      (!input.trim() && compareProducts.length === 0) ||
-                      chatMutation.isPending ||
-                      compareLoading
-                    }
-                    className="absolute right-1 top-1 bottom-1 aspect-square flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-colors disabled:opacity-40 group"
-                    title={
-                      compareProducts.length > 0
-                        ? `Compare these ${compareProducts.length} products`
-                        : 'Send message'
-                    }
-                  >
-                    {compareProducts.length > 0 ? (
-                      <span className="flex items-center gap-1 text-xs font-semibold">
-                        <GitCompareArrows size={16} />
-                        <span className="group-hover:block hidden text-[10px]">
-                          {compareProducts.length}
-                        </span>
-                      </span>
-                    ) : (
-                      <Send size={16} />
+
+                  {/* Actions (Mic + Send) */}
+                  <div className="absolute right-1 top-1 bottom-1 flex items-center gap-1">
+                    {isSpeechSupported && (
+                      <button
+                        type="button"
+                        onClick={toggleListening}
+                        aria-label={isListening ? 'Stop listening' : 'Start voice speech-to-text'}
+                        className={`h-full aspect-square flex items-center justify-center rounded-full transition-all ${
+                          isListening
+                            ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-500/40'
+                            : 'text-neutral-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-neutral-200 dark:hover:bg-neutral-800'
+                        }`}
+                        title={isListening ? 'Listening... Click to stop' : 'Speech to text voice input'}
+                      >
+                        {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                      </button>
                     )}
-                  </button>
+
+                    <button
+                      type="submit"
+                      disabled={
+                        (!input.trim() && compareProducts.length === 0) ||
+                        chatMutation.isPending ||
+                        compareLoading
+                      }
+                      className="h-full aspect-square flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-colors disabled:opacity-40 group"
+                      title={
+                        compareProducts.length > 0
+                          ? `Compare these ${compareProducts.length} products`
+                          : 'Send message'
+                      }
+                    >
+                      {compareProducts.length > 0 ? (
+                        <span className="flex items-center gap-1 text-xs font-semibold">
+                          <GitCompareArrows size={16} />
+                          <span className="group-hover:block hidden text-[10px]">
+                            {compareProducts.length}
+                          </span>
+                        </span>
+                      ) : (
+                        <Send size={16} />
+                      )}
+                    </button>
+                  </div>
                 </div>
               </form>
             </motion.div>

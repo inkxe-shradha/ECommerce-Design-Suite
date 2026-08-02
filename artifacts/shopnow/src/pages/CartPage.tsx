@@ -47,9 +47,29 @@ interface ShippingAddress {
 export default function CartPage() {
   const queryClient = useQueryClient();
   const { isLoggedIn, userName } = useUser();
+  const [isEmptyingCart, setIsEmptyingCart] = useState(false);
   const { data: cart, isLoading: isCartLoading } = useGetCart({
     query: { queryKey: getGetCartQueryKey() },
   });
+
+  const handleEmptyCart = async () => {
+    if (!cart?.items?.length) return;
+    setIsEmptyingCart(true);
+    try {
+      const res = await fetch('/api/cart/items', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        await queryClient.invalidateQueries({ queryKey: getGetCartQueryKey() });
+        await queryClient.refetchQueries({ queryKey: getGetCartQueryKey() });
+      }
+    } catch (err) {
+      console.error('Failed to empty cart:', err);
+    } finally {
+      setIsEmptyingCart(false);
+    }
+  };
 
   const LS_KEY = 'shopnow_saved_address';
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -149,9 +169,31 @@ export default function CartPage() {
     <AppLayout activePage="cart">
       <div className="bg-[#f8f9fb] dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen pb-24 transition-colors">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-6">
-            Shopping Cart
-          </h1>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
+                Shopping Cart
+              </h1>
+              {hasItems && (
+                <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/50 px-2.5 py-0.5 rounded-full">
+                  {cart.items.length} {cart.items.length === 1 ? 'item' : 'items'}
+                </span>
+              )}
+            </div>
+
+            {hasItems && (
+              <button
+                onClick={handleEmptyCart}
+                disabled={isEmptyingCart}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60 hover:border-red-300 dark:hover:border-red-800 transition-all font-semibold text-xs shadow-xs hover:shadow active:scale-95 disabled:opacity-50 cursor-pointer"
+                title="Remove all items from your cart"
+                data-testid="btn-empty-cart"
+              >
+                <Trash2 size={14} className={isEmptyingCart ? 'animate-bounce' : ''} />
+                {isEmptyingCart ? 'Emptying Cart...' : 'Empty Cart'}
+              </button>
+            )}
+          </div>
 
           {hasItems ? (
             <div className="flex flex-col lg:flex-row gap-8">
