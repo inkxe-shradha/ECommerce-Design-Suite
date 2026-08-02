@@ -1,4 +1,12 @@
 
+import dns from 'dns';
+
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {
+  // Ignore if unsupported in environment
+}
+
 import app from './app';
 import { logger } from './lib/logger';
 

@@ -1,5 +1,14 @@
 import * as dotenv from "dotenv";
 import path from "path";
+import dns from "dns";
+
+// Force IPv4 DNS resolution for cloud providers like Render that do not support IPv6 outbound routing
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {
+  // Ignore if unsupported in environment
+}
+
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
 
