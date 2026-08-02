@@ -8,6 +8,8 @@ import { checkoutRouter } from './checkout';
 import { ordersRouter } from './orders';
 import { aiRouter } from './ai';
 import { reviewsRouter } from './reviews';
+import { couponsRouter } from './coupons';
+import { gamingRouter } from './gaming';
 
 const router: IRouter = Router();
 
@@ -20,5 +22,7 @@ router.use(authRouter);
 router.use(checkoutRouter);
 router.use(ordersRouter);
 router.use('/ai', aiRouter);
+router.use(couponsRouter);
+router.use(gamingRouter);
 
 export default router;

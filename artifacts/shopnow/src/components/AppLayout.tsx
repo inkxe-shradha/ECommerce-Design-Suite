@@ -11,6 +11,12 @@ import {
   Moon,
   Package,
   User,
+  Smartphone,
+  Laptop,
+  Headphones,
+  Camera,
+  Cable,
+  Tag,
 } from 'lucide-react';
 import { useGetCart, getGetCartQueryKey } from '@workspace/api-client-react';
 import { useUser } from '../context/UserContext';
@@ -19,11 +25,19 @@ import { AIChatbot } from './AIChatbot';
 
 interface AppLayoutProps {
   children: React.ReactNode;
-  activePage?: 'home' | 'pdp' | 'cart';
+  activePage?: 'home' | 'pdp' | 'cart' | 'orders';
 }
 
+const categories = [
+  { label: 'Mobiles', icon: Smartphone },
+  { label: 'Laptops', icon: Laptop },
+  { label: 'Accessories', icon: Cable },
+  { label: 'Audio', icon: Headphones },
+  { label: 'Cameras', icon: Camera },
+];
+
 export function AppLayout({ children, activePage = 'home' }: AppLayoutProps) {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { data: cart } = useGetCart({
     query: { queryKey: getGetCartQueryKey() },
   });
@@ -33,6 +47,11 @@ export function AppLayout({ children, activePage = 'home' }: AppLayoutProps) {
   const cartCount =
     cart?.items?.reduce((acc, item) => acc + item.quantity, 0) || 0;
   const [searchQuery, setSearchQuery] = useState('');
+  const activeCategory = location.startsWith('/category/')
+    ? decodeURIComponent(location.replace('/category/', '').split('/')[0])
+    : undefined;
+  const isDealsActive =
+    location.startsWith('/search') && location.includes('sortBy=price_desc');
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,65 +89,42 @@ export function AppLayout({ children, activePage = 'home' }: AppLayoutProps) {
 
       {/* Nav */}
       <header className="bg-white dark:bg-slate-900 border-b border-[#e8eaf0] dark:border-slate-800 sticky top-0 z-50 shadow-[0_1px_8px_rgba(0,0,0,0.06)] transition-colors">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-[72px] sm:h-[76px] flex items-center justify-between gap-4 sm:gap-6">
           {/* Logo */}
           <Link
             href="/"
-            className="flex items-center gap-2 shrink-0"
+            className="flex items-center gap-2.5 shrink-0"
             data-testid="link-home"
           >
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center">
-              <Zap size={18} color="white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <Zap size={21} color="white" strokeWidth={2.5} />
             </div>
-            <span className="font-extrabold text-[20px] text-[#1a1a2e] dark:text-white tracking-tight whitespace-nowrap">
+            <span className="font-extrabold text-[22px] sm:text-[24px] text-[#1a1a2e] dark:text-white tracking-tight whitespace-nowrap">
               Shop<span className="text-indigo-500">Now</span>
             </span>
           </Link>
 
-          {/* Category nav — Hidden on mobile/tablet, shown on desktop (lg and up) */}
-          <nav className="hidden lg:flex gap-0.5 shrink-0">
-            {['Mobiles', 'Laptops', 'Accessories', 'Audio', 'Cameras'].map(
-              (cat) => (
-                <Link
-                  key={cat}
-                  href={`/category/${encodeURIComponent(cat)}`}
-                  className="px-2 py-1.5 rounded-md text-[12px] font-medium text-gray-700 dark:text-slate-300 flex items-center gap-0.5 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors whitespace-nowrap"
-                  data-testid={`button-nav-${cat.toLowerCase()}`}
-                >
-                  {cat}
-                </Link>
-              ),
-            )}
-            <Link
-              href="/search?sortBy=price_desc&inStock=true"
-              className="px-2 py-1.5 rounded-md text-[12px] font-medium text-gray-700 dark:text-slate-300 flex items-center gap-0.5 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors whitespace-nowrap"
-              data-testid="button-nav-deals"
-            >
-              Deals
-            </Link>
-          </nav>
-
           {/* Search — grows to fill remaining space on tablet/desktop, hidden on mobile */}
           <form
             onSubmit={handleSearch}
-            className="hidden sm:flex items-center bg-gray-100 dark:bg-slate-800/80 rounded-lg px-3 py-2 gap-2 flex-1 max-w-md min-w-0 border-[1.5px] border-gray-200 dark:border-slate-700 focus-within:border-indigo-400 dark:focus-within:border-indigo-500 transition-colors"
+            className="hidden sm:flex items-center bg-slate-50 dark:bg-slate-800/80 rounded-xl px-4 py-3 gap-2.5 flex-1 max-w-xl min-w-0 border border-slate-200 dark:border-slate-700 focus-within:border-indigo-400 dark:focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-colors"
           >
             <Search
-              size={14}
+              size={18}
               className="text-gray-400 dark:text-slate-400 shrink-0"
             />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search electronics…"
-              className="text-[12px] text-gray-900 dark:text-slate-100 bg-transparent outline-none w-full placeholder:text-gray-400 dark:placeholder:text-slate-400"
+              placeholder="Search products, brands and more"
+              className="text-sm text-gray-900 dark:text-slate-100 bg-transparent outline-none w-full placeholder:text-gray-400 dark:placeholder:text-slate-400"
               data-testid="search-input-desktop"
             />
           </form>
 
           {/* Right actions */}
-          <div className="flex items-center gap-2 shrink-0 relative">
+          <div className="flex items-center gap-2.5 shrink-0 relative">
             {/* AI Chatbot */}
             <AIChatbot />
 
@@ -137,7 +133,7 @@ export function AppLayout({ children, activePage = 'home' }: AppLayoutProps) {
               onClick={toggleTheme}
               title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
               aria-label={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg border-[1.5px] border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-gray-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl border border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-gray-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-200 dark:hover:border-indigo-700 transition-colors cursor-pointer"
               data-testid="button-theme-toggle"
             >
               {theme === 'light' ? (
@@ -210,7 +206,7 @@ export function AppLayout({ children, activePage = 'home' }: AppLayoutProps) {
             ) : (
               <button
                 onClick={() => setLocation('/login')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[12px] font-semibold transition-colors cursor-pointer whitespace-nowrap"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md shadow-indigo-500/20 transition-colors cursor-pointer whitespace-nowrap"
                 data-testid="button-sign-in"
               >
                 <LogIn size={13} /> Sign In
@@ -225,13 +221,13 @@ export function AppLayout({ children, activePage = 'home' }: AppLayoutProps) {
               aria-label={`Shopping cart${cartCount > 0 ? `, ${cartCount} items` : ''}`}
             >
               <div
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center border-[1.5px] ${
+                className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center border ${
                   activePage === 'cart'
                     ? 'bg-indigo-500 border-indigo-500 text-white'
                     : 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300'
                 }`}
               >
-                <ShoppingCart size={16} />
+                <ShoppingCart size={18} />
               </div>
               {cartCount > 0 && (
                 <div className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
@@ -242,22 +238,77 @@ export function AppLayout({ children, activePage = 'home' }: AppLayoutProps) {
           </div>
         </div>
 
+        {/* Desktop category navigation */}
+        <div className="hidden lg:block border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70">
+          <nav
+            className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-1"
+            aria-label="Product categories"
+          >
+            <Link
+              href="/"
+              className={`h-full px-3 flex items-center text-sm font-semibold border-b-2 transition-colors ${
+                activePage === 'home' && !activeCategory && !isDealsActive
+                  ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400'
+              }`}
+              data-testid="button-nav-home"
+            >
+              Discover
+            </Link>
+            {categories.map(({ label, icon: Icon }) => {
+              const isActive = activeCategory === label;
+
+              return (
+                <Link
+                  key={label}
+                  href={`/category/${encodeURIComponent(label)}`}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`h-full px-3 flex items-center gap-2 text-sm font-medium border-b-2 transition-colors ${
+                    isActive
+                      ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/70 dark:bg-indigo-950/30'
+                      : 'border-transparent text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600'
+                  }`}
+                  data-testid={`button-nav-${label.toLowerCase()}`}
+                >
+                  <Icon size={16} strokeWidth={2} />
+                  {label}
+                </Link>
+              );
+            })}
+            <div className="ml-auto h-full flex items-center">
+              <Link
+                href="/search?sortBy=price_desc&inStock=true"
+                aria-current={isDealsActive ? 'page' : undefined}
+                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  isDealsActive
+                    ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
+                    : 'bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60'
+                }`}
+                data-testid="button-nav-deals"
+              >
+                <Tag size={15} />
+                Deals
+              </Link>
+            </div>
+          </nav>
+        </div>
+
         {/* Mobile search row — shown on mobile screens under 640px */}
         <div className="sm:hidden px-4 pb-3">
           <form
             onSubmit={handleSearch}
-            className="flex items-center bg-gray-100 dark:bg-slate-800/80 rounded-lg px-3 py-2 gap-2 border-[1.5px] border-gray-200 dark:border-slate-700 w-full focus-within:border-indigo-400 dark:focus-within:border-indigo-500 transition-colors"
+            className="flex items-center bg-slate-50 dark:bg-slate-800/80 rounded-xl px-4 py-3 gap-2.5 border border-gray-200 dark:border-slate-700 w-full focus-within:border-indigo-400 dark:focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-colors"
           >
             <Search
-              size={14}
+              size={18}
               className="text-gray-400 dark:text-slate-400 shrink-0"
             />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search electronics…"
-              className="text-[12px] text-gray-900 dark:text-slate-100 bg-transparent outline-none w-full placeholder:text-gray-400 dark:placeholder:text-slate-400"
+              placeholder="Search products and brands"
+              className="text-sm text-gray-900 dark:text-slate-100 bg-transparent outline-none w-full placeholder:text-gray-400 dark:placeholder:text-slate-400"
               data-testid="search-input-mobile"
             />
           </form>
@@ -265,27 +316,33 @@ export function AppLayout({ children, activePage = 'home' }: AppLayoutProps) {
 
         {/* Categories scroll row — shown on mobile & tablet, hidden on desktop (lg and up) */}
         <div className="lg:hidden border-t border-[#e8eaf0] dark:border-slate-800 px-4 py-2 bg-gray-50/50 dark:bg-slate-900/50 overflow-x-auto scrollbar-none flex gap-2 whitespace-nowrap">
-          {[
-            'Mobiles',
-            'Laptops',
-            'Accessories',
-            'Audio',
-            'Cameras',
-            'Deals',
-          ].map((cat) => (
-            <Link
-              key={cat}
-              href={
-                cat === 'Deals'
-                  ? '/search?sortBy=price_desc&inStock=true'
-                  : `/category/${encodeURIComponent(cat)}`
-              }
-              className="px-3.5 py-2 rounded-full text-[12px] font-medium text-gray-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors shrink-0 min-h-[36px] flex items-center"
-              data-testid={`mobile-button-nav-${cat.toLowerCase()}`}
-            >
-              {cat}
-            </Link>
-          ))}
+          {[...categories, { label: 'Deals', icon: Tag }].map(
+            ({ label, icon: Icon }) => {
+              const isActive =
+                label === 'Deals' ? isDealsActive : activeCategory === label;
+
+              return (
+                <Link
+                  key={label}
+                  href={
+                    label === 'Deals'
+                      ? '/search?sortBy=price_desc&inStock=true'
+                      : `/category/${encodeURIComponent(label)}`
+                  }
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`px-3.5 py-2 rounded-full text-[12px] font-semibold border transition-colors shrink-0 min-h-[38px] flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm shadow-indigo-500/25'
+                      : 'text-gray-600 dark:text-slate-300 bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-700'
+                  }`}
+                  data-testid={`mobile-button-nav-${label.toLowerCase()}`}
+                >
+                  <Icon size={14} />
+                  {label}
+                </Link>
+              );
+            },
+          )}
         </div>
       </header>
 

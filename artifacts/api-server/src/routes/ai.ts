@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  checkGeminiAvailability,
+  checkAIAvailability,
   SupervisorAgent,
   loadUserContext,
 } from '../agents/index.js';
@@ -11,8 +11,8 @@ export const aiRouter = Router();
 const supervisorAgent = new SupervisorAgent();
 
 aiRouter.get('/status', async (_req, res) => {
-  const gemini = await checkGeminiAvailability();
-  return res.status(gemini.available ? 200 : 503).json({ gemini });
+  const status = await checkAIAvailability();
+  return res.status(status.available ? 200 : 503).json(status);
 });
 
 aiRouter.post('/chat', async (req, res) => {
@@ -41,7 +41,6 @@ aiRouter.post('/chat', async (req, res) => {
   }
 });
 
-// Compare products — returns structured feature breakdown + follow-up questions
 aiRouter.post('/compare', async (req, res) => {
   const { products } = req.body;
   if (!Array.isArray(products) || products.length < 2) {
@@ -59,7 +58,6 @@ aiRouter.post('/compare', async (req, res) => {
   }
 });
 
-// Recommend best product based on user answers to follow-up questions
 aiRouter.post('/recommend', async (req, res) => {
   const { products, userAnswers } = req.body;
   if (!Array.isArray(products) || products.length < 2) {

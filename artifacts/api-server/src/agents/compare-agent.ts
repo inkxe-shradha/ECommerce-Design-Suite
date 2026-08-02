@@ -1,12 +1,10 @@
-import { GoogleGenAI, Type } from '@google/genai';
-
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+import { getAIProvider, type StructuredSchema } from './ai-provider.js';
 
 export interface CompareFeature {
   label: string;
-  icon: string; // emoji icon
-  values: string[]; // one per product
-  winner?: number; // index of the winning product (0-based), -1 for tie
+  icon: string;
+  values: string[];
+  winner?: number;
   higherIsBetter?: boolean;
 }
 
@@ -14,21 +12,48 @@ export interface CompareResult {
   summary: string;
   features: CompareFeature[];
   followUpQuestions: string[];
-  verdict?: string; // null until user answers follow-up
+  verdict?: string;
 }
 
 export interface RecommendResult {
-  bestProductIndex: number; // 0-based
+  bestProductIndex: number;
   reason: string;
   alternativeNote?: string;
 }
 
-/**
- * Given an array of products, use Gemini to produce a structured comparison:
- * - feature-by-feature breakdown with winner per row
- * - follow-up questions relevant to the products' specs
- */
+const COMPARE_SCHEMA: StructuredSchema = {
+  type: 'object',
+  properties: {
+    summary: { type: 'string' },
+    features: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          label: { type: 'string' },
+          icon: { type: 'string' },
+          values: { type: 'array', items: { type: 'string' } },
+          winner: { type: 'number' },
+          higherIsBetter: { type: 'boolean' },
+        },
+      },
+    },
+    followUpQuestions: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+const RECOMMEND_SCHEMA: StructuredSchema = {
+  type: 'object',
+  properties: {
+    bestProductIndex: { type: 'number' },
+    reason: { type: 'string' },
+    alternativeNote: { type: 'string' },
+  },
+};
+
 export async function compareProducts(products: any[]): Promise<CompareResult> {
+  const provider = getAIProvider();
+
   const productSummaries = products.map(
     (p, i) =>
       `Product ${i + 1}: ${p.name}\nPrice: ₹${Math.round(parseFloat(p.price)).toLocaleString()}\nRating: ${p.rating}\nBrand: ${p.brand || 'Unknown'}\nDiscount: ${p.discountPct || 0}%\nSpecs: ${p.specs || 'N/A'}`,
@@ -69,18 +94,7 @@ Rules:
 - Respond ONLY with valid JSON, no markdown`;
 
   try {
-    const model = genAI.models;
-    const result = await model.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-
-    const text = result.text || '';
-    const json = JSON.parse(text);
-
+    const json = await provider.generateStructuredJSON(prompt, COMPARE_SCHEMA);
     return {
       summary: json.summary || '',
       features: json.features || [],
@@ -88,18 +102,16 @@ Rules:
     };
   } catch (err) {
     console.error('compareProducts error:', err);
-    // Fallback: build basic comparison from product data
     return buildFallbackComparison(products);
   }
 }
 
-/**
- * After user answers follow-up questions, use Gemini to recommend the best product.
- */
 export async function recommendProduct(
   products: any[],
   userAnswers: string,
 ): Promise<RecommendResult> {
+  const provider = getAIProvider();
+
   const productSummaries = products.map(
     (p, i) =>
       `Product ${i + 1}: ${p.name} — ₹${Math.round(parseFloat(p.price)).toLocaleString()} — Rating: ${p.rating} — ${p.specs || ''}`,
@@ -122,15 +134,7 @@ Return JSON:
 bestProductIndex is 0-based. Respond ONLY with valid JSON.`;
 
   try {
-    const result = await genAI.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-    const text = result.text || '';
-    const json = JSON.parse(text);
+    const json = await provider.generateStructuredJSON(prompt, RECOMMEND_SCHEMA);
     return {
       bestProductIndex: json.bestProductIndex ?? 0,
       reason: json.reason || '',

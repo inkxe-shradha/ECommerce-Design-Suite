@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { AppLayout } from '../components/AppLayout';
 import { AnonymousRecommendationWidget } from '../components/AnonymousRecommendationWidget';
+import { CouponBox } from '../components/CouponBox';
 import {
   useGetCart,
   useUpdateCartItem,
@@ -29,6 +30,10 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUser } from '../context/UserContext';
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
 
 interface ShippingAddress {
   name: string;
@@ -160,12 +165,10 @@ export default function CartPage() {
                   >
                     <div className="w-32 h-32 bg-gray-50 dark:bg-slate-800/80 rounded-lg border border-gray-100 dark:border-slate-800 flex items-center justify-center p-2">
                       <img
-                        src={
-                          item.product.imageUrl ||
-                          `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`
-                        }
+                        src={resolveProductImageSrc(item.product.imageUrl, item.product.name)}
                         alt={item.product.name}
                         className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                        onError={(e) => onProductImageError(e, item.product.name)}
                       />
                     </div>
                     <div className="flex-1 flex flex-col">
@@ -440,7 +443,7 @@ export default function CartPage() {
                       {cart.discount > 0 && (
                         <div className="flex justify-between">
                           <span>
-                            Discount{' '}
+                            Coupon discount{' '}
                             {cart.couponApplied
                               ? `(${cart.couponApplied})`
                               : ''}
@@ -459,6 +462,13 @@ export default function CartPage() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Coupon entry */}
+                    <CouponBox
+                      couponApplied={cart.couponApplied ?? null}
+                      couponInfo={(cart as any).couponInfo}
+                      discount={cart.discount}
+                    />
 
                     <div className="border-t border-gray-100 dark:border-slate-800 pt-3 pb-1 mb-2">
                       <div className="flex justify-between items-center">
@@ -575,11 +585,9 @@ export default function CartPage() {
                     >
                       <div className="w-20 h-20 bg-white rounded-lg p-2 flex-shrink-0 flex items-center justify-center">
                         <img
-                          src={
-                            rec.product.imageUrl ||
-                            `${import.meta.env.BASE_URL}images/headphones.jpg`
-                          }
+                          src={resolveProductImageSrc(rec.product.imageUrl)}
                           className="w-full h-full object-contain mix-blend-multiply"
+                          onError={onProductImageError}
                         />
                       </div>
                       <div className="flex-1">
@@ -628,11 +636,9 @@ export default function CartPage() {
                       >
                         <div className="w-16 h-16 bg-gray-50 dark:bg-slate-800/80 rounded flex items-center justify-center p-1">
                           <img
-                            src={
-                              rec.product.imageUrl ||
-                              `${import.meta.env.BASE_URL}images/usb-hub.jpg`
-                            }
+                            src={resolveProductImageSrc(rec.product.imageUrl)}
                             className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                            onError={onProductImageError}
                           />
                         </div>
                         <div className="flex-1 flex flex-col justify-center">
@@ -677,11 +683,9 @@ export default function CartPage() {
                       >
                         <div className="w-16 h-16 bg-gray-50 dark:bg-slate-800/80 rounded flex items-center justify-center p-1">
                           <img
-                            src={
-                              rec.product.imageUrl ||
-                              `${import.meta.env.BASE_URL}images/ssd.jpg`
-                            }
+                            src={resolveProductImageSrc(rec.product.imageUrl)}
                             className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                            onError={onProductImageError}
                           />
                         </div>
                         <div className="flex-1">

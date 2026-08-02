@@ -10,7 +10,7 @@ export class OrdersAgent implements Agent {
 
   async execute(
     ctx: AgentContext,
-    parsed: ParsedIntent,
+    _parsed: ParsedIntent,
   ): Promise<AgentResponse> {
     const { userContext, userId } = ctx;
 
@@ -26,20 +26,17 @@ export class OrdersAgent implements Agent {
 
     const name = userContext.name ? `, ${userContext.name}` : '';
 
-    let reply = parsed.reply;
-    if (!reply) {
-      const orderSummary = userContext.recentOrders?.length
-        ? userContext.recentOrders
-            .map(
-              (o) =>
-                `• Order #${o.id}: ${o.products.join(', ')} — ₹${o.totalAmount} (${o.status})`,
-            )
-            .join('\n')
-        : `You haven't placed any orders yet${name}. Browse our collection and find something you love! 🛍️`;
-      reply = userContext.recentOrders?.length
-        ? `Here are your recent orders${name}:\n\n${orderSummary}`
-        : orderSummary;
-    }
+    const orderSummary = userContext.recentOrders?.length
+      ? userContext.recentOrders
+          .map(
+            (o) =>
+              `• Order #${o.id}: ${o.products.join(', ')} — ₹${o.totalAmount} (${o.status})`,
+          )
+          .join('\n')
+      : `You haven't placed any orders yet${name}. Browse our collection and find something you love! 🛍️`;
+    const reply = userContext.recentOrders?.length
+      ? `Here are your recent orders${name}:\n\n${orderSummary}`
+      : orderSummary;
 
     return {
       reply,

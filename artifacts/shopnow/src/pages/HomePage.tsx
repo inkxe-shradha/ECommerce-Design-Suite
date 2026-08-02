@@ -17,6 +17,10 @@ import { AnonymousRecommendationWidget } from "../components/AnonymousRecommenda
 import { useListProducts, useListDeals, useGetHomepageRecommendations, useAddToCart, getGetCartQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "../context/UserContext";
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
 
 // Skeleton components for loading states
 function CarouselSkeleton() {
@@ -115,7 +119,7 @@ export default function HomePage() {
     useListProducts({ featured: true });
   const { data: deals, isLoading: isDealsLoading } = useListDeals();
   const { data: homepageRecs, isLoading: isRecsLoading } =
-    useGetHomepageRecommendations({ userId: 1 });
+    useGetHomepageRecommendations();
 
   // Anonymous: pull mobiles and laptops from product list
   const { data: allProducts, isLoading: isAllLoading } = useListProducts();
@@ -266,12 +270,10 @@ export default function HomePage() {
                       )}
                       <div className="h-40 bg-gray-50 dark:bg-slate-800/80 rounded-lg mb-4 flex items-center justify-center overflow-hidden p-2">
                         <img
-                          src={
-                            deal.imageUrl ||
-                            `${import.meta.env.BASE_URL}images/galaxy-s23.jpg`
-                          }
+                          src={resolveProductImageSrc(deal.imageUrl)}
                           alt={deal.name}
                           className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                          onError={onProductImageError}
                         />
                       </div>
                       <h3 className="font-semibold text-gray-900 dark:text-slate-100 text-sm mb-1 line-clamp-2">
@@ -313,27 +315,33 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ─── LOGGED-IN: personalised AI widgets ─── */}
-        {isLoggedIn && isRecsLoading && (
+        {/* ─── Personalised AI Preference Cards ─── */}
+        {isRecsLoading && (
           <>
             <RecommendationSkeleton />
             <RecommendationSkeleton />
           </>
         )}
-        {isLoggedIn && homepageRecs && (
+        {homepageRecs && (
           <>
-            <RecommendationWidget
-              widget={homepageRecs.contentBased}
-              variant="content_based"
-            />
-            <RecommendationWidget
-              widget={homepageRecs.hybrid}
-              variant="hybrid"
-            />
-            <RecommendationWidget
-              widget={homepageRecs.collaborative}
-              variant="collaborative"
-            />
+            {homepageRecs.hybrid && (
+              <RecommendationWidget
+                widget={homepageRecs.hybrid}
+                variant="hybrid"
+              />
+            )}
+            {homepageRecs.contentBased && (
+              <RecommendationWidget
+                widget={homepageRecs.contentBased}
+                variant="content_based"
+              />
+            )}
+            {homepageRecs.collaborative && (
+              <RecommendationWidget
+                widget={homepageRecs.collaborative}
+                variant="collaborative"
+              />
+            )}
           </>
         )}
 

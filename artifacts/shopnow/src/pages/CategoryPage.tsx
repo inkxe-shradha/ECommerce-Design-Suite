@@ -3,7 +3,18 @@ import { useParams } from 'wouter';
 import { AppLayout } from '../components/AppLayout';
 import { ProductCard } from '../components/ProductCard';
 import { useSearchProducts } from '@workspace/api-client-react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Cpu,
+  Thermometer,
+  MonitorPlay,
+  MemoryStick,
+  HardDrive,
+  Zap,
+  Search,
+  X,
+} from 'lucide-react';
 import { Link } from 'wouter';
 
 const SORT_OPTIONS = [
@@ -14,22 +25,49 @@ const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
 ] as const;
 
+const GAMING_COMPONENT_TYPES = [
+  { label: 'All', value: '', icon: null },
+  { label: 'Processors', value: 'Processor', icon: Cpu },
+  { label: 'CPU Coolers', value: 'CPU Cooler', icon: Thermometer },
+  { label: 'Graphics Cards', value: 'Graphics Card', icon: MonitorPlay },
+  { label: 'RAM', value: 'RAM', icon: MemoryStick },
+  { label: 'Storage', value: 'Storage', icon: HardDrive },
+  { label: 'Power Supplies', value: 'Power Supply', icon: Zap },
+] as const;
+
 export default function CategoryPage() {
   const { category } = useParams<{ category: string }>();
   const categoryName = decodeURIComponent(category || '');
+  const isGaming = categoryName.toLowerCase() === 'gaming';
 
   const [sortBy, setSortBy] =
     useState<(typeof SORT_OPTIONS)[number]['value']>('relevance');
   const [page, setPage] = useState(1);
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [componentType, setComponentType] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const { data, isLoading } = useSearchProducts({
-    category: categoryName,
-    sortBy,
-    page,
-    limit: 20,
-    inStock: inStockOnly ? true : undefined,
-  });
+  // For Gaming, use department filter; for others, use flat category filter
+  const searchParams = isGaming
+    ? {
+        department: 'Gaming',
+        ...(componentType ? { componentType } : {}),
+        ...(searchQuery.trim() ? { q: searchQuery.trim() } : {}),
+        sortBy,
+        page,
+        limit: 20,
+        inStock: inStockOnly ? true : undefined,
+      }
+    : {
+        category: categoryName,
+        ...(searchQuery.trim() ? { q: searchQuery.trim() } : {}),
+        sortBy,
+        page,
+        limit: 20,
+        inStock: inStockOnly ? true : undefined,
+      };
+
+  const { data, isLoading } = useSearchProducts(searchParams as any);
 
   return (
     <AppLayout>
@@ -44,17 +82,101 @@ export default function CategoryPage() {
               Home
             </Link>
             <ChevronRight size={14} />
-            <span className="text-gray-900 dark:text-white font-medium">
-              {categoryName}
-            </span>
+            {isGaming && componentType ? (
+              <>
+                <Link
+                  href="/category/Gaming"
+                  className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                >
+                  Gaming
+                </Link>
+                <ChevronRight size={14} />
+                <span className="text-gray-900 dark:text-white font-medium">
+                  {componentType}
+                </span>
+              </>
+            ) : (
+              <span className="text-gray-900 dark:text-white font-medium">
+                {categoryName}
+              </span>
+            )}
           </nav>
+
+          {/* Gaming component-type filter pills */}
+          {isGaming && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {GAMING_COMPONENT_TYPES.map((ct) => {
+                const Icon = ct.icon;
+                const active = componentType === ct.value;
+                return (
+                  <button
+                    key={ct.value}
+                    onClick={() => {
+                      setComponentType(ct.value);
+                      setPage(1);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                      active
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500'
+                    }`}
+                  >
+                    {Icon && <Icon size={12} />}
+                    {ct.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Quick Search input box */}
+          <div className="mb-6">
+            <div className="relative flex items-center max-w-xl">
+              <Search
+                size={18}
+                className="absolute left-3.5 text-gray-400 dark:text-slate-500 pointer-events-none"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setPage(1);
+                }}
+                placeholder={
+                  isGaming
+                    ? 'Quick search gaming products (e.g. Ryzen 7, RTX 4070, DDR5, Corsair, 360mm)...'
+                    : `Quick search in ${categoryName}...`
+                }
+                className="w-full pl-10 pr-10 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl text-sm text-gray-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 shadow-sm transition-all"
+                data-testid="input-quick-search-gaming"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setPage(1);
+                  }}
+                  className="absolute right-3.5 p-1 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                  aria-label="Clear quick search"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                {categoryName}
+                {isGaming && componentType ? componentType : categoryName}
               </h1>
+              {isGaming && (
+                <p className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold mt-1">
+                  🎮 Gaming Components
+                </p>
+              )}
               {data && (
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
                   {data.total} product{data.total !== 1 ? 's' : ''}

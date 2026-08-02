@@ -68,6 +68,10 @@ export function invalidateCache(prefix: string) {
   }
 }
 
+export function clearAllCache() {
+  cache.clear();
+}
+
 /**
  * Middleware that adds Cache-Control headers without in-memory caching.
  * Good for endpoints that change per-user but benefit from browser caching.

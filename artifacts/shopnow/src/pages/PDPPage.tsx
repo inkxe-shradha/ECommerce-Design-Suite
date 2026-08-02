@@ -29,6 +29,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useUser } from '../context/UserContext';
 import { useToast } from '../context/ToastContext';
 import { logAndAlertError } from '../lib/errorHandler';
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
 
 export default function PDPPage() {
   const { id } = useParams();
@@ -171,13 +175,40 @@ export default function PDPPage() {
     );
   }
 
-  const images = [
-    product.imageUrl || `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`,
-    `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`,
-    `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`,
-    `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`,
-  ];
-  const activeImage = images[activeImageIdx];
+  let rawImages: string[] = [];
+  const prodImages = (product as any).images;
+  if (prodImages) {
+    try {
+      if (Array.isArray(prodImages)) {
+        rawImages = prodImages;
+      } else if (typeof prodImages === 'string') {
+        const parsed = JSON.parse(prodImages);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          rawImages = parsed;
+        }
+      }
+    } catch {
+      // Fallback if parsing fails
+    }
+  }
+  if (rawImages.length === 0 && product.imageUrl) {
+    rawImages = [product.imageUrl];
+  }
+  const images = rawImages.map((img) => resolveProductImageSrc(img));
+  const activeImage = images[activeImageIdx] || images[0];
+
+  let parsedSpecsObj: Record<string, any> | null = null;
+  if (product.specs) {
+    try {
+      if (typeof product.specs === 'object') {
+        parsedSpecsObj = product.specs;
+      } else if (typeof product.specs === 'string' && product.specs.trim().startsWith('{')) {
+        parsedSpecsObj = JSON.parse(product.specs);
+      }
+    } catch {
+      parsedSpecsObj = null;
+    }
+  }
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('en-IN', {
@@ -263,14 +294,10 @@ export default function PDPPage() {
                   <Heart size={20} />
                 </button>
                 <img
-                  src={
-                    activeImage.startsWith('http') ||
-                    activeImage.startsWith('/')
-                      ? activeImage
-                      : `${import.meta.env.BASE_URL}${activeImage}`
-                  }
+                  src={resolveProductImageSrc(activeImage)}
                   alt={product.name}
                   className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal transition-transform duration-500 group-hover:scale-105"
+                  onError={onProductImageError}
                 />
               </div>
               <div className="flex gap-4">
@@ -282,12 +309,9 @@ export default function PDPPage() {
                     data-testid={`btn-thumb-${i}`}
                   >
                     <img
-                      src={
-                        img.startsWith('http') || img.startsWith('/')
-                          ? img
-                          : `${import.meta.env.BASE_URL}${img}`
-                      }
+                      src={resolveProductImageSrc(img)}
                       className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                      onError={onProductImageError}
                     />
                   </button>
                 ))}
@@ -358,7 +382,27 @@ export default function PDPPage() {
                 </div>
               </div>
 
-              {product.specs && (
+              {parsedSpecsObj ? (
+                <div className="mb-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-2.5">
+                    Key Specs Highlights
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(parsedSpecsObj)
+                      .filter(([key]) => !['cpuSocket', 'supportedSockets', 'ramGeneration', 'coolerType', 'gpuLength', 'psuWattage', 'radiatorSize', 'storageInterface'].includes(key))
+                      .slice(0, 4)
+                      .map(([key, val]) => (
+                        <div
+                          key={key}
+                          className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700"
+                        >
+                          <span className="text-slate-500 dark:text-slate-400 font-medium">{key}: </span>
+                          <span className="font-semibold">{String(val)}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ) : product.specs ? (
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-2">
                     Key Specs
@@ -367,7 +411,7 @@ export default function PDPPage() {
                     {product.specs}
                   </p>
                 </div>
-              )}
+              ) : null}
 
               <div className="mb-8">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100 mb-3">
@@ -502,11 +546,9 @@ export default function PDPPage() {
                         <Check size={12} color="white" />
                       </div>
                       <img
-                        src={
-                          product.imageUrl ||
-                          `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`
-                        }
+                        src={resolveProductImageSrc(product.imageUrl)}
                         className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                        onError={onProductImageError}
                       />
                     </div>
                     <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-1">
@@ -531,11 +573,11 @@ export default function PDPPage() {
                                 <Check size={12} color="white" />
                               </div>
                               <img
-                                src={
-                                  rec.product.imageUrl ||
-                                  `${import.meta.env.BASE_URL}images/mouse.jpg`
-                                }
+                                src={resolveProductImageSrc(
+                                  rec.product.imageUrl,
+                                )}
                                 className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                                onError={onProductImageError}
                               />
                             </div>
                           </Link>
@@ -623,11 +665,9 @@ export default function PDPPage() {
                         <Check size={12} color="white" />
                       </div>
                       <img
-                        src={
-                          product.imageUrl ||
-                          `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`
-                        }
+                        src={resolveProductImageSrc(product.imageUrl)}
                         className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                        onError={onProductImageError}
                       />
                     </div>
                     <div className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-1">
@@ -652,11 +692,11 @@ export default function PDPPage() {
                                 <Check size={12} color="white" />
                               </div>
                               <img
-                                src={
-                                  rec.product.imageUrl ||
-                                  `${import.meta.env.BASE_URL}images/mouse.jpg`
-                                }
+                                src={resolveProductImageSrc(
+                                  rec.product.imageUrl,
+                                )}
                                 className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                                onError={onProductImageError}
                               />
                             </div>
                           </Link>
@@ -978,6 +1018,22 @@ function ProductTabs({
     }
   };
 
+  let parsedSpecsObj: Record<string, any> | null = null;
+  if (product.specs) {
+    try {
+      if (typeof product.specs === 'object') {
+        parsedSpecsObj = product.specs;
+      } else if (
+        typeof product.specs === 'string' &&
+        product.specs.trim().startsWith('{')
+      ) {
+        parsedSpecsObj = JSON.parse(product.specs);
+      }
+    } catch {
+      parsedSpecsObj = null;
+    }
+  }
+
   const tabs = ['description', 'specifications', 'reviews'] as const;
 
   return (
@@ -1001,48 +1057,179 @@ function ProductTabs({
       </div>
 
       {activeTab === 'description' && (
-        <div className="prose prose-sm max-w-none text-gray-600 dark:text-slate-300">
-          <p>
-            Experience unmatched performance with the {product.name}. Designed
-            for professionals and creators, it features top-tier components
-            ensuring smooth multitasking and rendering.
+        <div className="prose prose-sm max-w-none text-gray-600 dark:text-slate-300 space-y-4">
+          <p className="text-base leading-relaxed">
+            {product.description || (
+              <>
+                Experience unmatched performance with the{' '}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {product.name}
+                </span>
+                . Designed for gaming enthusiasts, creators, and professionals,
+                it features top-tier component quality and reliable
+                performance.
+              </>
+            )}
           </p>
-          {product.specs && <p>{product.specs}</p>}
+          {parsedSpecsObj && (
+            <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">
+                Key Highlights
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {Object.entries(parsedSpecsObj)
+                  .filter(
+                    ([key]) =>
+                      ![
+                        'cpuSocket',
+                        'supportedSockets',
+                        'ramGeneration',
+                        'coolerType',
+                        'gpuLength',
+                        'psuWattage',
+                        'radiatorSize',
+                        'storageInterface',
+                      ].includes(key),
+                  )
+                  .slice(0, 6)
+                  .map(([key, val]) => (
+                    <div
+                      key={key}
+                      className="bg-white dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200/60 dark:border-slate-800"
+                    >
+                      <div className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase">
+                        {key}
+                      </div>
+                      <div className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                        {String(val)}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {activeTab === 'specifications' && (
         <div className="text-sm text-gray-600 dark:text-slate-300">
-          {product.specs ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-50 dark:bg-slate-900 rounded-lg p-4">
-                <div className="text-xs font-semibold text-gray-400 uppercase mb-2">
-                  Details
+          {parsedSpecsObj && Object.keys(parsedSpecsObj).length > 0 ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Technical Specifications */}
+              <div className="lg:col-span-2 bg-gray-50 dark:bg-slate-900/90 rounded-xl p-6 border border-gray-200/70 dark:border-slate-800">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-slate-800">
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                    <span>⚡ Technical Specifications</span>
+                  </h3>
+                  {product.componentType && (
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900">
+                      {product.componentType}
+                    </span>
+                  )}
                 </div>
-                <p>{product.specs}</p>
+                <div className="divide-y divide-gray-200/60 dark:divide-slate-800">
+                  {Object.entries(parsedSpecsObj)
+                    .filter(
+                      ([key]) =>
+                        ![
+                          'cpuSocket',
+                          'supportedSockets',
+                          'ramGeneration',
+                          'coolerType',
+                          'gpuLength',
+                          'psuWattage',
+                          'radiatorSize',
+                          'storageInterface',
+                        ].includes(key),
+                    )
+                    .map(([key, val]) => (
+                      <div
+                        key={key}
+                        className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1"
+                      >
+                        <span className="text-xs font-medium text-gray-500 dark:text-slate-400 sm:w-1/3">
+                          {key}
+                        </span>
+                        <span className="text-sm font-semibold text-gray-900 dark:text-slate-100 sm:w-2/3 text-left sm:text-right">
+                          {Array.isArray(val) ? val.join(', ') : String(val)}
+                        </span>
+                      </div>
+                    ))}
+                </div>
               </div>
-              <div className="bg-gray-50 dark:bg-slate-900 rounded-lg p-4 space-y-2">
-                <div className="text-xs font-semibold text-gray-400 uppercase mb-2">
-                  General
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Brand</span>
-                  <span className="font-medium">{product.brand}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Category</span>
-                  <span className="font-medium">{product.category}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">In Stock</span>
-                  <span className="font-medium">
-                    {product.inStock ? 'Yes' : 'No'}
-                  </span>
+
+              {/* General Info */}
+              <div className="bg-gray-50 dark:bg-slate-900/90 rounded-xl p-6 border border-gray-200/70 dark:border-slate-800 space-y-4 h-fit">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider pb-3 border-b border-gray-200 dark:border-slate-800">
+                  📋 Product Details
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500 dark:text-slate-400 font-medium">
+                      Brand
+                    </span>
+                    <span className="font-bold text-gray-900 dark:text-white">
+                      {product.brand}
+                    </span>
+                  </div>
+                  {product.department && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-500 dark:text-slate-400 font-medium">
+                        Department
+                      </span>
+                      <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                        🎮 {product.department}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500 dark:text-slate-400 font-medium">
+                      Category
+                    </span>
+                    <span className="font-semibold text-gray-800 dark:text-slate-200">
+                      {product.category}
+                    </span>
+                  </div>
+                  {product.componentType && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-500 dark:text-slate-400 font-medium">
+                        Component Type
+                      </span>
+                      <span className="font-semibold text-gray-800 dark:text-slate-200">
+                        {product.componentType}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500 dark:text-slate-400 font-medium">
+                      Availability
+                    </span>
+                    <span
+                      className={`font-bold ${
+                        product.inStock
+                          ? 'text-green-600 dark:text-emerald-400'
+                          : 'text-red-600'
+                      }`}
+                    >
+                      {product.inStock ? 'In Stock' : 'Out of Stock'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
+          ) : product.specs ? (
+            <div className="bg-gray-50 dark:bg-slate-900 rounded-xl p-6 border border-gray-200 dark:border-slate-800">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">
+                Specifications
+              </h3>
+              <p className="text-sm text-gray-700 dark:text-slate-300">
+                {product.specs}
+              </p>
+            </div>
           ) : (
-            <p className="text-gray-400">No specifications available.</p>
+            <p className="text-gray-400">
+              No specifications available for this product.
+            </p>
           )}
         </div>
       )}

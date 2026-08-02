@@ -11,6 +11,10 @@ import {
   Zap,
 } from 'lucide-react';
 import type { Product } from '@workspace/api-client-react';
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
 
 interface FeaturedCarouselProps {
   products: Product[];
@@ -252,10 +256,11 @@ export function FeaturedCarousel({
             />
             <div className="relative w-56 h-56 md:w-72 md:h-72 lg:w-80 lg:h-80">
               <img
-                src={product.imageUrl}
+                src={resolveProductImageSrc(product.imageUrl)}
                 alt={product.name}
                 className="w-full h-full object-contain drop-shadow-2xl relative z-10"
                 loading={current === 0 ? 'eager' : 'lazy'}
+                onError={onProductImageError}
               />
             </div>
           </div>

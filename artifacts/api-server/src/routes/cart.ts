@@ -7,77 +7,97 @@ import {
   UpdateCartItemBody,
   RemoveFromCartParams,
 } from "@workspace/api-zod";
+import { buildQuote } from "../services/pricing.js";
+import type { CartLine } from "../services/pricing.js";
+import {
+  clearSessionCoupon,
+  getSessionCoupon,
+  setSessionCoupon,
+} from "./session-coupons.js";
 
 const router = Router();
-const COUPON_CODE = "TECH20";
-const DISCOUNT_RATE = 0.2;
 
 function getSessionId(req: Request): string {
   const cookieUser = req.cookies?.session_user_id;
   return cookieUser ? `user_${cookieUser}` : "default";
 }
 
-async function buildCartResponse(sessionId: string) {
+function getUserId(req: Request): number | null {
+  const cookieUser = req.cookies?.session_user_id;
+  return cookieUser ? parseInt(cookieUser, 10) : null;
+}
+
+async function buildCartResponse(
+  sessionId: string,
+  userId: number | null,
+  couponCode?: string,
+) {
   const cartRows = await db
     .select()
     .from(cartItemsTable)
     .where(eq(cartItemsTable.sessionId, sessionId));
 
-  const items = await Promise.all(
-    cartRows.map(async (row) => {
-      const [product] = await db
-        .select()
-        .from(productsTable)
-        .where(eq(productsTable.id, row.productId))
-        .limit(1);
-      return product
-        ? {
-            product: {
-              ...product,
-              price: Number(product.price),
-              originalPrice:
-                product.originalPrice != null
-                  ? Number(product.originalPrice)
-                  : null,
-              rating: Number(product.rating),
-            },
-            quantity: row.quantity,
-          }
-        : null;
-    })
-  );
+  const rawLines: CartLine[] = (
+    await Promise.all(
+      cartRows.map(async (row) => {
+        const [product] = await db
+          .select()
+          .from(productsTable)
+          .where(eq(productsTable.id, row.productId))
+          .limit(1);
+        if (!product) return null;
+        return {
+          productId: row.productId,
+          quantity: row.quantity,
+          price: Number(product.price),
+          product,
+        } as CartLine;
+      }),
+    )
+  ).filter(Boolean) as CartLine[];
 
-  const validItems = items.filter(Boolean) as {
-    product: { price: number; [key: string]: unknown };
-    quantity: number;
-  }[];
+  // Use persisted session coupon if no explicit code provided
+  const activeCoupon = couponCode ?? getSessionCoupon(sessionId);
+  const quote = await buildQuote(rawLines, userId, activeCoupon);
 
-  const subtotal = validItems.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
-    0
-  );
-  const discount = subtotal * DISCOUNT_RATE;
-  const deliveryFee = 0;
-  const total = subtotal - discount + deliveryFee;
+  const validItems = rawLines.map((l) => ({
+    product: {
+      ...(l.product as any),
+      price: Number((l.product as any).price),
+      originalPrice:
+        (l.product as any).originalPrice != null
+          ? Number((l.product as any).originalPrice)
+          : null,
+      rating: Number((l.product as any).rating),
+    },
+    quantity: l.quantity,
+  }));
+
+  const appliedCode =
+    quote.coupon && !quote.coupon.rejectionReason ? quote.coupon.code : null;
 
   return {
     items: validItems,
-    subtotal: Math.round(subtotal * 100) / 100,
-    discount: Math.round(discount * 100) / 100,
-    deliveryFee,
-    total: Math.round(total * 100) / 100,
-    couponApplied: validItems.length > 0 ? COUPON_CODE : null,
+    subtotal: quote.subtotal,
+    productDiscountAmount: quote.productDiscountAmount,
+    discount: quote.couponDiscountAmount,
+    deliveryFee: quote.shippingAmount,
+    total: quote.total,
+    couponApplied: appliedCode,
+    couponInfo: quote.coupon ?? null,
   };
 }
 
 router.get("/cart", async (req, res): Promise<void> => {
   const sessionId = getSessionId(req);
-  const cart = await buildCartResponse(sessionId);
+  const userId = getUserId(req);
+  const cart = await buildCartResponse(sessionId, userId);
   res.json(cart);
 });
 
 router.post("/cart/items", async (req, res): Promise<void> => {
   const sessionId = getSessionId(req);
+  const userId = getUserId(req);
   const parsed = AddToCartBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -92,8 +112,8 @@ router.post("/cart/items", async (req, res): Promise<void> => {
     .where(
       and(
         eq(cartItemsTable.sessionId, sessionId),
-        eq(cartItemsTable.productId, productId)
-      )
+        eq(cartItemsTable.productId, productId),
+      ),
     )
     .limit(1);
 
@@ -110,12 +130,13 @@ router.post("/cart/items", async (req, res): Promise<void> => {
     });
   }
 
-  const cart = await buildCartResponse(sessionId);
+  const cart = await buildCartResponse(sessionId, userId);
   res.json(cart);
 });
 
 router.patch("/cart/items/:productId", async (req, res): Promise<void> => {
   const sessionId = getSessionId(req);
+  const userId = getUserId(req);
   const rawId = Array.isArray(req.params.productId)
     ? req.params.productId[0]
     : req.params.productId;
@@ -138,8 +159,8 @@ router.patch("/cart/items/:productId", async (req, res): Promise<void> => {
       .where(
         and(
           eq(cartItemsTable.sessionId, sessionId),
-          eq(cartItemsTable.productId, productId)
-        )
+          eq(cartItemsTable.productId, productId),
+        ),
       );
   } else {
     await db
@@ -148,17 +169,18 @@ router.patch("/cart/items/:productId", async (req, res): Promise<void> => {
       .where(
         and(
           eq(cartItemsTable.sessionId, sessionId),
-          eq(cartItemsTable.productId, productId)
-        )
+          eq(cartItemsTable.productId, productId),
+        ),
       );
   }
 
-  const cart = await buildCartResponse(sessionId);
+  const cart = await buildCartResponse(sessionId, userId);
   res.json(cart);
 });
 
 router.delete("/cart/items/:productId", async (req, res): Promise<void> => {
   const sessionId = getSessionId(req);
+  const userId = getUserId(req);
   const rawId = Array.isArray(req.params.productId)
     ? req.params.productId[0]
     : req.params.productId;
@@ -175,11 +197,38 @@ router.delete("/cart/items/:productId", async (req, res): Promise<void> => {
     .where(
       and(
         eq(cartItemsTable.sessionId, sessionId),
-        eq(cartItemsTable.productId, parsed.data.productId)
-      )
+        eq(cartItemsTable.productId, parsed.data.productId),
+      ),
     );
 
-  const cart = await buildCartResponse(sessionId);
+  const cart = await buildCartResponse(sessionId, userId);
+  res.json(cart);
+});
+
+/** POST /cart/coupon — apply a coupon to the session */
+router.post("/cart/coupon", async (req, res): Promise<void> => {
+  const sessionId = getSessionId(req);
+  const userId = getUserId(req);
+  const { couponCode } = req.body as { couponCode?: string };
+  if (!couponCode || typeof couponCode !== "string") {
+    res.status(400).json({ error: "couponCode is required" });
+    return;
+  }
+  setSessionCoupon(sessionId, couponCode);
+  const cart = await buildCartResponse(
+    sessionId,
+    userId,
+    couponCode.trim().toUpperCase(),
+  );
+  res.json(cart);
+});
+
+/** DELETE /cart/coupon — remove applied coupon */
+router.delete("/cart/coupon", async (req, res): Promise<void> => {
+  const sessionId = getSessionId(req);
+  const userId = getUserId(req);
+  clearSessionCoupon(sessionId);
+  const cart = await buildCartResponse(sessionId, userId);
   res.json(cart);
 });
 

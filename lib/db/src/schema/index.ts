@@ -3,3 +3,5 @@ export * from "./cart";
 export * from './users';
 export * from './orders';
 export * from './reviews';
+export * from './coupons';
+export * from './coupon-redemptions';

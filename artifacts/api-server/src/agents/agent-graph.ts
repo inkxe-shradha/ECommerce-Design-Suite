@@ -1,6 +1,7 @@
 import { AddToCartAgent } from './add-to-cart-agent.js';
 import { AddressAgent } from './address-agent.js';
 import { BundleAdvisorAgent } from './bundle-advisor-agent.js';
+import { GamingBuildAdvisorAgent } from './gaming-build-advisor-agent.js';
 import { GreetingAgent } from './greeting-agent.js';
 import { OrdersAgent } from './orders-agent.js';
 import { PopularProductsAgent } from './popular-products-agent.js';
@@ -27,6 +28,7 @@ export class AgentGraph {
     popular_products: new PopularProductsAgent(),
     add_to_cart: new AddToCartAgent(),
     bundle_advisor: new BundleAdvisorAgent(),
+    gaming_build: new GamingBuildAdvisorAgent(),
     unknown: new UnknownAgent(),
   };
 

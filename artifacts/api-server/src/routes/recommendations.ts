@@ -50,55 +50,60 @@ function makeWidget(
   };
 }
 
-// Homepage recs: cache 3 min (personalised but stable)
-router.get("/recommendations/homepage", cacheMiddleware(THREE_MIN), async (req, res): Promise<void> => {
+// Homepage recs: dynamic per-user session
+router.get("/recommendations/homepage", async (req, res): Promise<void> => {
   const firstName = await getFirstName(req);
-  const allProducts = await db.select().from(productsTable).limit(30);
+  const allProducts = await db.select().from(productsTable).limit(50);
 
   const laptopsAndAccessories = allProducts.filter((p) =>
-    ["Laptops", "Accessories"].includes(p.category)
+    ["Laptops", "Accessories", "Gaming"].includes(p.category) || p.department === "Gaming"
   );
   const trending = allProducts.filter((p) =>
     ["Mobiles", "Audio", "Accessories"].includes(p.category)
   );
-  const hybrid = allProducts.filter((p) => p.isFeatured);
+  const hybrid = allProducts.filter((p) => p.isFeatured || Number(p.rating) >= 4.5);
 
   res.json({
     contentBased: makeWidget(
       'content_based',
-      'Based on Your Interests',
-      'Electronics matching your browsing history',
-      laptopsAndAccessories.slice(0, 5),
+      'Based on Your Tech Interests',
+      'Personalized electronics matching your browsing history',
+      (laptopsAndAccessories.length >= 4 ? laptopsAndAccessories : allProducts).slice(0, 6),
       [
         'Similar to your browsing',
-        'Matches Laptops',
-        'Frequently viewed',
+        'Matches your tech stack',
+        'Frequently viewed together',
         'Accessory match',
-        'Similar to your browsing',
+        'Top choice for you',
+        'Recommended based on history',
       ],
     ),
     collaborative: makeWidget(
       'collaborative',
       'Trending Among Similar Shoppers',
-      'What people like you are buying this week',
-      trending.slice(0, 4),
+      'What tech enthusiasts like you are buying this week',
+      (trending.length >= 4 ? trending : allProducts).slice(0, 6),
       [
         'Trending in your segment',
         'Popular this week',
-        'High demand — only 4 left',
+        'High demand product',
         'People like you bought this',
+        'Top seller this month',
+        'Highly rated by buyers',
       ],
     ),
     hybrid: makeWidget(
       'hybrid',
-      `${firstName}'s Top Picks`,
-      'Curated mix of trending picks and your preferences',
-      hybrid.slice(0, 4),
+      `${firstName}'s Personal AI Preferences`,
+      'Curated mix of top AI recommendations tailored for you',
+      (hybrid.length >= 4 ? hybrid : allProducts).slice(0, 6),
       [
         'Editorial pick + your history',
-        'Trending + personalized',
+        'Trending + personalized for you',
         'Top rated for your profile',
-        `Curated for ${firstName}`,
+        `Curated specifically for ${firstName}`,
+        'Matches your saved preferences',
+        'Top AI recommendation',
       ],
     ),
   });

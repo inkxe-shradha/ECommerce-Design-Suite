@@ -24,6 +24,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../context/UserContext';
 import { Link } from 'wouter';
 import { MarkdownMessage } from './MarkdownMessage';
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
 
 interface OrderInfo {
   id: number;
@@ -623,13 +627,10 @@ export function AIChatbot() {
                                   className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl p-2 text-center"
                                 >
                                   <img
-                                    src={p.imageUrl}
+                                    src={resolveProductImageSrc(p.imageUrl, p.name)}
                                     alt={p.name}
                                     className="w-10 h-10 object-cover rounded-lg mx-auto mb-1.5"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src =
-                                        'https://via.placeholder.com/40';
-                                    }}
+                                    onError={(e) => onProductImageError(e, p.name)}
                                   />
                                   <div className="text-[10px] font-semibold text-neutral-800 dark:text-neutral-200 line-clamp-2">
                                     {p.name}
@@ -847,13 +848,10 @@ export function AIChatbot() {
                                   className="w-12 h-12 bg-neutral-100 dark:bg-neutral-900 rounded-lg flex items-center justify-center shrink-0 overflow-hidden hover:ring-2 hover:ring-indigo-400 transition-all"
                                 >
                                   <img
-                                    src={p.imageUrl}
+                                    src={resolveProductImageSrc(p.imageUrl, p.name)}
                                     alt={p.name}
                                     className="w-11 h-11 object-cover rounded-lg"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src =
-                                        'https://via.placeholder.com/44';
-                                    }}
+                                    onError={(e) => onProductImageError(e, p.name)}
                                   />
                                 </Link>
                                 <Link
@@ -1003,13 +1001,10 @@ export function AIChatbot() {
                             <X size={10} />
                           </button>
                           <img
-                            src={p.imageUrl}
+                            src={resolveProductImageSrc(p.imageUrl, p.name)}
                             alt={p.name}
                             className="w-full h-20 object-cover rounded-lg mb-2"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src =
-                                'https://via.placeholder.com/64';
-                            }}
+                            onError={(e) => onProductImageError(e, p.name)}
                           />
                           <div className="text-[11px] font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2 mb-1">
                             {p.name}

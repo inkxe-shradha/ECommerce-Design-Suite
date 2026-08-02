@@ -4,6 +4,10 @@ import { Star, ShoppingCart } from "lucide-react";
 import { motion } from 'framer-motion';
 import { Product, useAddToCart, getGetCartQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
 
 interface ProductCardProps {
   product: Product;
@@ -28,7 +32,6 @@ export function ProductCard({ product, reason, className = "" }: ProductCardProp
     );
   };
 
-  const imageUrl = product.imageUrl || `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`;
   const formattedPrice = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(product.price);
 
   return (
@@ -43,13 +46,10 @@ export function ProductCard({ product, reason, className = "" }: ProductCardProp
         >
           <div className="h-40 bg-gray-50 dark:bg-slate-800/80 rounded-lg mb-3 flex items-center justify-center overflow-hidden relative p-2">
             <img
-              src={
-                imageUrl.startsWith('http') || imageUrl.startsWith('/')
-                  ? imageUrl
-                  : `${import.meta.env.BASE_URL}${imageUrl}`
-              }
+              src={resolveProductImageSrc(product.imageUrl, product.name)}
               alt={product.name}
               className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+              onError={(e) => onProductImageError(e, product.name)}
             />
             <button
               onClick={handleAddToCart}
@@ -69,8 +69,15 @@ export function ProductCard({ product, reason, className = "" }: ProductCardProp
             )}
           </div>
 
-          <div className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-            {product.brand}
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
+              {product.brand}
+            </span>
+            {(product as any).componentType && (
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                {(product as any).componentType}
+              </span>
+            )}
           </div>
           <h3 className="font-semibold text-gray-900 dark:text-slate-100 text-sm leading-tight mb-1 line-clamp-2">
             {product.name}

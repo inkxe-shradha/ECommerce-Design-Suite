@@ -21,6 +21,10 @@ import {
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '../context/UserContext';
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
 
 function useCarousel() {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -212,12 +216,10 @@ export function RecommendationWidget({
                   >
                     <div className="w-14 h-14 bg-white rounded-lg shadow-lg overflow-hidden flex items-center justify-center p-1.5 shrink-0 group-hover/item:ring-2 group-hover/item:ring-indigo-400 transition-all">
                       <img
-                        src={
-                          p.product.imageUrl ||
-                          `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`
-                        }
+                        src={resolveProductImageSrc(p.product.imageUrl)}
                         alt={p.product.name}
                         className="w-full h-full object-contain mix-blend-multiply"
+                        onError={onProductImageError}
                       />
                     </div>
                     <div className="flex-1 min-w-0">

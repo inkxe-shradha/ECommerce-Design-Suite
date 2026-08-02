@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { build as esbuild } from "esbuild";
+import { build as esbuild, context as createEsbuildContext } from "esbuild";
 import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
 
@@ -126,7 +126,7 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   };
 
   if (watchMode) {
-    const context = await esbuild.context(buildOptions);
+    const context = await createEsbuildContext(buildOptions);
     await context.watch();
     console.log("Watching API server source files for changes...");
     return;
