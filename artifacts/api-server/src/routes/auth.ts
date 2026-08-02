@@ -39,15 +39,22 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     })
     .returning();
 
-  res.cookie(COOKIE_NAME, String(newUser.id), {
+  const isProd = process.env.NODE_ENV === "production";
+  const cookieOptions = {
     httpOnly: true,
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-  });
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    sameSite: isProd ? ("none" as const) : ("lax" as const),
+    secure: isProd,
+    path: "/",
+  };
+
+  res.cookie(COOKIE_NAME, String(newUser.id), cookieOptions);
 
   res.json({
     id: newUser.id,
     name: newUser.name,
     email: newUser.email,
+    token: String(newUser.id),
   });
 });
 
@@ -71,31 +78,43 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
-  res.cookie(COOKIE_NAME, String(user.id), {
+  const isProd = process.env.NODE_ENV === "production";
+  const cookieOptions = {
     httpOnly: true,
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-  });
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    sameSite: isProd ? ("none" as const) : ("lax" as const),
+    secure: isProd,
+    path: "/",
+  };
+
+  res.cookie(COOKIE_NAME, String(user.id), cookieOptions);
 
   res.json({
     id: user.id,
     name: user.name,
     email: user.email,
+    token: String(user.id),
   });
 });
 
 router.post("/auth/logout", (_req, res): void => {
-  res.clearCookie(COOKIE_NAME);
+  res.clearCookie(COOKIE_NAME, { path: "/" });
   res.json({ message: "Logged out successfully" });
 });
 
 router.get("/auth/me", async (req, res): Promise<void> => {
-  const userIdCookie = req.cookies[COOKIE_NAME];
-  if (!userIdCookie) {
+  const authHeader = req.headers.authorization;
+  const headerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : (req.headers["x-user-id"] as string);
+
+  const userIdRaw = req.cookies[COOKIE_NAME] || headerToken;
+  if (!userIdRaw) {
     res.status(401).json({ error: "Not authenticated" });
     return;
   }
 
-  const userId = parseInt(userIdCookie, 10);
+  const userId = parseInt(userIdRaw, 10);
   if (isNaN(userId)) {
     res.status(401).json({ error: "Not authenticated" });
     return;

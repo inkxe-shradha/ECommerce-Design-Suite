@@ -123,6 +123,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       wasLoggedInRef.current = false; // Reset since user is now logged out
       try {
         sessionStorage.removeItem('shopnow_ai_chat');
+        localStorage.removeItem('shopnow_auth_token');
       } catch {}
       queryClient.clear();
       queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
