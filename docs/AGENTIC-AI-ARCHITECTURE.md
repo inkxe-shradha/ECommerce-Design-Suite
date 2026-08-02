@@ -1,8 +1,8 @@
-**# 🤖 Agentic AI Architecture — ShopNow E-Commerce
+# 🤖 Agentic AI Architecture — ShopNow E-Commerce
 
 ## Overview
 
-ShopNow implements a **supervisor-driven, graph-style multi-agent conversational AI** system that provides personalized, multi-turn shopping assistance. The system uses Google Gemini for intent classification, a supervisor for orchestration, and an explicit agent graph for specialist execution.
+ShopNow implements a **supervisor-driven, graph-style multi-agent conversational AI** system that provides personalized, multi-turn shopping assistance. The system features an **Adaptive Self-Correction & Error Recovery Engine**, a **Multi-Turn Guided Product Advisor Engine** for all electronics categories, a pluggable model-provider layer for intent classification, a supervisor for orchestration and fault-tolerant fallbacks, and a deterministic PC Builder engine supporting complete 8-component gaming rigs.
 
 ---
 
@@ -14,28 +14,42 @@ flowchart TD
     Frontend -->|POST /api/ai/chat<br/>message + history| API[📡 API Route Handler]
     API --> LoadCtx[Load User Context<br/>Orders, Brands, Interests]
     LoadCtx --> Supervisor[🧠 SupervisorAgent]
-    Supervisor --> Router{RouterAgent<br/>Intent Classification}
+    
+    Supervisor --> SelfCorrection{Self-Correction Engine<br/>detectCorrection}
+    SelfCorrection -->|User Correction Detected| PrependPrefix[Format Empathetic Acknowledgment]
+    SelfCorrection --> Router{RouterAgent<br/>Intent Classification}
 
-    Router -->|Gemini API| Gemini[🔮 Google Gemini 1.5 Flash<br/>Structured JSON Output]
+    Router -->|Gemini API| Gemini[🔮 Google Gemini Flash Models<br/>Structured JSON Output]
+    Router -->|OpenAI-compatible provider| OpenCode[⚡ OpenAI-compatible JSON provider<br/>AI_PROVIDER=opencode]
     Router -->|Fallback| LocalParse[📋 Local Fallback Parser<br/>Regex + Keyword Matching]
 
     Gemini --> Clarify{Clarification Policy}
+    OpenCode --> Clarify
     LocalParse --> Clarify
     Clarify -->|Budget only, no target| Clarification[Ask category with follow-up chips]
     Clarify -->|Target supplied| Dispatch
 
     Dispatch{AgentGraph / GraphRunner} -->|greeting| GA[👋 GreetingAgent]
     Dispatch -->|product_search| PSA[🔍 ProductSearchAgent]
+    Dispatch -->|guided_advisor| GPA[📱 GuidedProductAdvisorAgent]
     Dispatch -->|bundle_advisor| BA[🎁 BundleAdvisorAgent]
+    Dispatch -->|gaming_build| GBA[🎮 GamingBuildAdvisorAgent]
     Dispatch -->|orders| OA[📦 OrdersAgent]
     Dispatch -->|address| AA[📍 AddressAgent]
     Dispatch -->|top_picks| TPA[⭐ TopPicksAgent]
     Dispatch -->|add_to_cart| ACA[🛒 AddToCartAgent]
     Dispatch -->|unknown| UA[❓ UnknownAgent]
 
+    GPA --> MultiTurnFlow[📱 Multi-Turn Guided Consultation<br/>Phase 1: Use Case ➔ Phase 2: Budget ➔ Phase 3: #1 Best Match]
+    GBA --> PCBuilder[🖥️ pc-builder Service<br/>Full 8-Component Rig Engine]
+    GBA --> BrandDiscovery[🏷️ Stockpile Brand Chooser<br/>ASUS, MSI, Gigabyte, Zotac, etc.]
+    GBA --> CouponEngine[🎟️ Inline Coupon Savings Calculator<br/>BUILD50K, GAMING10, CPU15, GPU5K]
+
     GA --> Guardrail[🛡️ GuardrailAgent<br/>Response contract validation]
     PSA --> Guardrail
+    GPA --> Guardrail
     BA --> Guardrail
+    GBA --> Guardrail
     OA --> Guardrail
     AA --> Guardrail
     TPA --> Guardrail
@@ -51,34 +65,34 @@ flowchart TD
 
 ---
 
-## Multi-Turn Conversation Flow
+## Multi-Turn Conversation & Self-Correction Flow
 
 ```mermaid
 sequenceDiagram
     participant U as 👤 User
     participant FE as 🖥️ Frontend
-    participant BE as 🧠 RouterAgent
-    participant DB as 🗄️ Database
+    participant SA as 🧠 SupervisorAgent / Self-Correction
+    participant GPA as 📱 GuidedProductAdvisorAgent
+    participant DB as 🗄️ Database / PostgreSQL
 
-    U->>FE: "I'm a student, want to buy good for me"
-    FE->>BE: {message, history: []}
-    BE->>BE: Classify → bundle_advisor (persona: student)
-    BE-->>FE: {reply: "📚 Got it! What's your budget?", followUp: ["Under ₹30k", "₹50k", "Premium"]}
-    FE-->>U: Shows question + suggestion chips
+    U->>FE: "Help me to pick up best mobil"
+    FE->>SA: {message: "Help me to pick up best mobil", history: []}
+    SA->>GPA: Classify → guided_advisor (Phase 1)
+    GPA-->>FE: {reply: "📱 What is your primary use case for your new Mobile?", followUp: ["📷 Photography & Vlogging", "🎮 Gaming & High Performance", "🔋 Long Battery Life"]}
+    FE-->>U: Shows Phase 1 Use-Case Prompt + Chips
 
-    U->>FE: Clicks "Around ₹50,000 (Good value)"
-    FE->>BE: {message, history: [prev messages]}
-    BE->>BE: BundleAdvisor detects persona+budget → builds bundle
-    BE->>DB: Query Laptops + Audio + Accessories (inventory-aware)
-    BE-->>FE: {reply: "📚 Student Bundle!", products[3], followUp: ["Add all to cart", "Swap laptop", "Cheaper?"]}
-    FE-->>U: Bundle with 3 products + total price + chips
+    U->>FE: "📷 Photography & Vlogging"
+    FE->>SA: {message: "📷 Photography & Vlogging", history: [...]}
+    SA->>GPA: Category Preserved: Mobiles → Phase 2 Target Budget
+    GPA-->>FE: {reply: "💰 What is your target budget for your Photography & Vlogging Mobiles?", followUp: ["Under ₹15,000", "₹15,000 - ₹30,000", "₹30,000 - ₹60,000", "Premium ₹60,000+"]}
+    FE-->>U: Shows Phase 2 Budget Prompt + Chips
 
-    U->>FE: Clicks "Add all to cart"
-    FE->>BE: {message: "Add all to cart", history: [...]}
-    BE->>BE: Classify → add_to_cart (bulk mode)
-    BE->>DB: Find products from history → INSERT all into cart
-    BE-->>FE: {reply: "✅ Added 3 items!", products[3], followUp: ["Checkout", "More accessories"]}
-    FE-->>U: Confirmation + next steps
+    U->>FE: "₹30,000 - ₹60,000"
+    FE->>SA: {message: "₹30,000 - ₹60,000", history: [...]}
+    SA->>GPA: Query DB (Mobiles, InStock, ₹30k-₹60k, Camera Specs)
+    GPA->>DB: Fetch top rated phones
+    GPA-->>FE: {reply: "## 🌟 #1 Recommended Choice: Galaxy S21 (Variant) — ₹57,822", products[3], followUp: ["Yes, add best match to cart", "Show cheaper option", "Can I save with a coupon?"]}
+    FE-->>U: Renders #1 Best Match + Rationale + Top Alternatives + Action Chips
 ```
 
 ---
@@ -89,320 +103,97 @@ sequenceDiagram
 
 ```
 artifacts/api-server/src/agents/
-├── index.ts                    # Barrel exports
-├── types.ts                    # Shared interfaces
-├── supervisor-agent.ts         # 🧠 Orchestrates the complete agent workflow
-├── router-agent.ts             # Intent classification only
-├── clarification-policy.ts     # Stops vague budget-only catalog searches
-├── agent-graph.ts              # Specialist nodes and intent edges
-├── graph-runner.ts             # Executes the selected graph path
-├── guardrail-agent.ts          # Validates final frontend response contract
-├── user-context.ts             # Loads user profile from DB
-├── greeting-agent.ts           # 👋 Welcome + personalization
-├── product-search-agent.ts     # 🔍 Cascading product search with keyword intelligence
-├── bundle-advisor-agent.ts     # 🎁 Profession-based bundle recommendations
-├── top-picks-agent.ts          # ⭐ History-based recommendations
-├── orders-agent.ts             # 📦 Order history (login-gated)
-├── address-agent.ts            # 📍 Shipping address (login-gated)
-├── add-to-cart-agent.ts        # 🛒 Single + bulk add via conversation
-└── unknown-agent.ts            # ❓ Fallback + suggestions
+├── index.ts                       # Barrel exports
+├── types.ts                       # Shared interfaces
+├── supervisor-agent.ts            # 🧠 Orchestrates agent workflow + fault-tolerant recovery
+├── self-correction-engine.ts      # 💡 Detects user corrections & generates empathetic self-correcting prefixes
+├── router-agent.ts                # Intent classification + active conversation persistence
+├── guided-product-advisor-agent.ts# 📱 3-Phase Multi-Turn Guided Advisor for Mobiles, Laptops, Audio, Cameras
+├── clarification-policy.ts        # Stops vague budget-only catalog searches
+├── gaming-build-advisor-agent.ts    # 🎮 8-Component PC Build advisor, brand chooser & inline coupon calculator
+├── agent-graph.ts                 # Specialist nodes and intent edges
+├── graph-runner.ts                # Executes the selected graph path
+├── guardrail-agent.ts             # Validates final frontend response contract
+├── user-context.ts                # Loads user profile from DB
+├── greeting-agent.ts              # 👋 Welcome + personalization
+├── product-search-agent.ts        # 🔍 Cascading product search with keyword intelligence
+├── bundle-advisor-agent.ts        # 🎁 Profession-based bundle recommendations
+├── top-picks-agent.ts             # ⭐ History-based recommendations
+├── orders-agent.ts                # 📦 Order history (login-gated)
+├── address-agent.ts               # 📍 Shipping address (login-gated)
+├── add-to-cart-agent.ts           # 🛒 Single + bulk add via conversation
+└── unknown-agent.ts               # ❓ Fallback + suggestions
 ```
 
 ---
 
-## Core Interfaces
+## Core Agent Capabilities
 
-```typescript
-interface AgentContext {
-  message: string;
-  userId: number | null;
-  userContext: UserContext;
-  history?: Array<{ role: string; content: string }>;
-}
+### 📱 Guided Product Advisor Engine (`guided-product-advisor-agent.ts`)
 
-interface AgentResponse {
-  reply: string;           // Natural language response
-  products: any[];         // Product cards to display
-  orders: any[];           // Order cards to display
-  requiresLogin?: boolean; // Show login button
-  followUp?: string[];     // Suggestion chips for next turn
-  userContext: { ... };    // User metadata
-}
+- **Multi-Category Guided Consultation**: Supports **Mobiles**, **Laptops**, **Audio/Headphones**, **Cameras**, **TV & Smart Displays**, **Tablets**, and **Accessories**.
+- **Phase-by-Phase Interactive Questioning**:
+  - **Phase 1 (Primary Use Case)**: e.g. `📷 Photography & Vlogging`, `🎮 Gaming & High Performance`, `🔋 Long Battery Life`, `💼 Business & Office Work`, `🎬 Movies & Streaming` (TVs), `🎨 Digital Art & Drawing` (Tablets).
+  - **Phase 2 (Target Budget & Brand Filters)**: e.g. `Under ₹15,000`, `₹15,000 - ₹30,000`, `₹30,000 - ₹60,000`, `Premium ₹60,000+`.
+  - **Phase 3 (Precision Match & #1 Single Best Product)**: Ranks products by ratings & use-case specifications, presenting the **#1 Single Best Match** with an itemized recommendation rationale and top alternatives.
+- **Out-of-Catalog Category Redirects**: TV and Tablet queries present friendly alternative guidance (Monitors, Laptops, Audio) instead of breaking.
+- **Context Preservation**: Retains category and user choices across multi-turn chip selections without getting hijacked.
 
-interface UserContext {
-  name?: string;
-  recentOrders?: Array<{ id, totalAmount, status, products[] }>;
-  lastAddress?: any;
-  interests?: string[];           // Categories from order history
-  purchasedProductIds?: number[]; // Already bought (exclude from recs)
-  purchasedBrands?: string[];     // Preferred brands
-}
-```
+### 💡 Self-Correction & Error Recovery Engine (`self-correction-engine.ts`)
 
----
+- **User Correction Detection**: Scans user input for correction patterns (`"no I meant"`, `"that's not what I asked"`, `"I already said"`, `"you misunderstood"`, `"wrong brand"`).
+- **Empathy & Learning**: Generates natural, apologetic acknowledgment prefixes (`"💡 Understood! My apologies for the brand mixup. I've updated the brand filter for you:"`).
+- **Empty Response Guard (`supervisor-agent.ts`)**: Scans downstream agent outputs. If an agent returns 0 products or a blank response, the Supervisor injects contextual recovery guidance and rescue chips.
+- **Fault Tolerance**: Wraps graph execution in `try-catch` blocks. If downstream API calls or LLM services fail, `SupervisorAgent` triggers a self-healing fallback response instead of breaking the chat.
 
-## Agent Details
+### 🎮 Human-Style Store Advisor PC Builder (`gaming-build-advisor-agent.ts` & `pc-builder.ts`)
 
-### 🧠 SupervisorAgent and RouterAgent
+- **5-Step Human Store Advisor Conversation Flow**:
+  1. 💰 **Budget Selection**: Target total budget (`₹60,000`, `₹1,00,000`, `1.5 lakh`, `₹2,50,000`, `₹3,00,000`).
+  2. 🎯 **Use Case / Workload**: `🎮 Pure Gaming & Esports`, `🎬 Video Editing & Content Creation`, `📡 Live Streaming & Gaming`, `💼 Heavy Workstation & CAD`.
+  3. 🔵🔴 **Processor (CPU) Brand**: `🔵 Intel`, `🔴 AMD Ryzen`, `🤖 Let AI decide — best value for budget`.
+  4. 🟢🔴 **Graphics Card (GPU) Brand**: `🟢 Nvidia RTX`, `🔴 AMD Radeon`, `🤖 Let AI decide — best FPS/₹`.
+  5. 📺 **Target Monitor Resolution**: `⚡ 1080p High FPS (Esports)`, `🎯 1440p QHD High-Refresh`, `🌟 4K Ultra Gaming`, `🖥️ Multi-Monitor Workstation`.
+- **Full 8-Component Rigs**: Recommends complete, compatible hardware configurations across **Processor**, **CPU Cooler**, **Graphics Card**, **RAM**, **Storage**, **Power Supply**, **Motherboard** (404 items in catalog), and **Case / Cabinet** (629 items in catalog).
+- **Decimal & Multi-Format Budget Parser**: Converts inputs like `1.5 lakh`, `1.5L`, `150k`, `₹1,50,000`, `1.5` to ₹150,000.
+- **Stockpile Brand Chooser**: Dynamically queries live in-stock brands (`ASUS`, `MSI`, `Gigabyte`, `Zotac`, `Corsair`, `Lian Li`, `NZXT`) and handles unstocked requests by providing a 1-tap brand discovery menu.
+- **Inline Coupon Calculator**: Calculates exact promo code savings directly inside the PC build flow (`BUILD50K`, `GAMING10`, `CPU15`, `GPU5K`).
+- **Post-Build Interactive Swaps**: Supports instant commands like `"Swap GPU to Nvidia"`, `"Swap CPU to Intel"`, `"Show cheaper build"`, `"Upgrade build"`.
 
-| Feature                | Implementation                                                                                             |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Supervisor**         | Runs classification, clarification, graph execution, and response guardrails                              |
-| **Router primary**     | Google Gemini 1.5 Flash with structured JSON schema                                                        |
-| **Router fallback**    | Local regex/keyword parser (no API key needed)                                                             |
-| **Context**            | Passes conversation history for multi-turn awareness                                                       |
-| **Graph intents**      | `greeting`, `product_search`, `bundle_advisor`, `orders`, `address`, `top_picks`, `add_to_cart`, `unknown` |
-| **Clarification**      | Budget-only searches ask for a category before querying products                                           |
+### 🧭 Intent-Aware Router Agent (`router-agent.ts`)
 
-### 🔍 ProductSearchAgent (Cascading Search)
+- **Fast-Path Pattern Routing**:
+  - `Compare`: Detects `vs`, `versus`, `compare X with Y` → direct comparison intent.
+  - `Returns/Refunds`: Detects return/exchange requests → routes to `orders` agent with return instructions.
+  - `Deals & Offers`: Routes flash sales and coupon requests to `popular_products`.
+  - `PC Building vs Generic Gaming`: Strictly separates `"pc build"` / `"build a gaming pc"` from generic `"gaming laptops"` or `"gaming headset"`.
+  - `Active Conversation Persistence`: Preserves ongoing multi-turn advisor sessions across CPU/GPU brand questions, budget steps, and confirmation flows.
 
-```mermaid
-flowchart TD
-    Start[User Query] --> L1{Level 1:<br/>Full keyword + category}
-    L1 -->|Results found| Return[Return products]
-    L1 -->|No results| L2{Level 2:<br/>Split keyword into parts<br/>Match ANY part}
-    L2 -->|Results found| Return
-    L2 -->|No results| L3{Level 3:<br/>Category + brand only<br/>Drop keyword}
-    L3 -->|Results found| Return
-    L3 -->|No results| L4[Level 4:<br/>Category only<br/>Top rated]
-    L4 --> Return
-```
+### ❓ Dynamic Intent-Rescue Fallback (`unknown-agent.ts`)
 
-- **Cascading strategy**: Specific → progressively broader (never returns empty)
-- Builds Drizzle ORM queries with category/price/brand/keyword filters
-- Only shows in-stock products (limit 6)
-- **Generates smart follow-ups** based on results, budget, brands, category
+- Analyzes unmatched messages to surface category-specific rescue chips (e.g. Return/Refund steps, Warranty info, Compare syntax, or TV/Tablet alternative redirects) instead of generic dead-ends.
 
-### 🎁 BundleAdvisorAgent (Profession-Based Bundles)
+### 📦 Order Tracking & Return Management (`orders-agent.ts`)
 
-```mermaid
-flowchart TD
-    Start[User Message] --> Guard{Non-Electronics<br/>Guardrail}
-    Guard -->|clothes, food, etc.| Redirect[Politely redirect<br/>to electronics]
-    Guard -->|Electronics OK| Persona{Detect Persona}
-
-    Persona -->|Not detected| AskPersona[Ask: What do you do?<br/>Student/Gamer/Professional/...]
-    Persona -->|Detected| Ready{Enough Context?}
-
-    Ready -->|Need more info| AskNeeds[Ask about needs/budget]
-    Ready -->|Ready| Inventory[Check Store Inventory]
-
-    Inventory --> Build[Build Curated Bundle<br/>1 product per category]
-    Build --> Scale[Scale prices to budget]
-    Scale --> Response[Show Bundle + Total Price<br/>+ Add All to Cart]
-
-    AskPersona -->|User answers| Persona
-    AskNeeds -->|User answers| Ready
-```
-
-**Supported Professions (10):**
-
-| Persona      | Emoji | Bundle Categories                                    |
-| ------------ | ----- | ---------------------------------------------------- |
-| Student      | 📚    | Laptop + Headphones + Accessories                    |
-| Gamer        | 🎮    | Gaming Laptop + Headset + Peripherals                |
-| Professional | 💼    | Work Laptop + NC Headphones + Ergonomics             |
-| Creator      | 🎬    | Camera + Audio + Editing Laptop                      |
-| Doctor       | 🩺    | Portable Laptop + Phone + Headphones                 |
-| Teacher      | 👩‍🏫    | Laptop + Webcam/Accessories + Headset                |
-| Architect    | 🏗️    | Powerful Laptop + Precision Mouse + Focus Headphones |
-| Musician     | 🎵    | Studio Headphones + Production Laptop + Audio Gear   |
-| Photographer | 📸    | Camera + Editing Laptop + Accessories                |
-| Freelancer   | 🏠    | Versatile Laptop + NC Headphones + Office Essentials |
-
-**Key Intelligence Features:**
-
-- ✅ **Inventory-aware** — checks actual stock before recommending
-- ✅ **Budget scaling** — scales all item prices proportionally to budget
-- ✅ **Guardrails** — rejects non-electronics (clothes, food, furniture, etc.)
-- ✅ **Multi-turn** — asks follow-up questions before building bundle
-- ✅ **Suggests alternatives** when items are out of stock
-
-### 🛒 AddToCartAgent (Single + Bulk)
-
-| Mode       | Trigger                              | Behaviour                                                      |
-| ---------- | ------------------------------------ | -------------------------------------------------------------- |
-| **Single** | "add to cart"                        | Adds top product from conversation context                     |
-| **Bulk**   | "add all to cart" / "add everything" | Parses product names from recent AI messages, adds ALL to cart |
-
-- Reads `**Product Name**` patterns from assistant messages in history
-- Checks for duplicates (already in cart)
-- Returns total for all added items + checkout follow-up
-
-### ⭐ TopPicksAgent (Recommendation Engine)
-
-```mermaid
-flowchart TD
-    Start{Has Order History?}
-    Start -->|Yes| P1[Priority 1: Same brands<br/>not already purchased]
-    Start -->|Has interests only| P3[Query by interest categories]
-    Start -->|Guest/No data| P4[Top-rated in-stock products]
-
-    P1 --> P2[Priority 2: Same categories<br/>new brands to discover]
-    P2 --> Merge[Merge & cap at 5 products]
-    Merge --> Fill{< 3 results?}
-    Fill -->|Yes| Filler[Fill with top-rated stock]
-    Fill -->|No| Done[Return with follow-ups]
-    Filler --> Done
-
-    P3 --> Done
-    P4 --> Done
-```
-
-### 🔐 Login-Gated Agents (Orders, Address, AddToCart)
-
-- Check `userId` before executing
-- Return `requiresLogin: true` + friendly prompt
-- Frontend renders an inline "Log In →" button
+- **Order ID Extraction**: Automatically extracts `"order 123"` or `"order #45"` to fetch and format single order details.
+- **Native Returns Handling**: Detects return/refund requests and lists delivered orders eligible for return with step-by-step guidance.
 
 ---
 
-## Guardrails & Safety
+## 🧾 Order Details & Tax Invoice System (`/order/:id`, `/orders/:id`)
 
-### Non-Electronics Guardrail
-
-The system detects requests for non-electronics categories and politely redirects:
-
-```
-❌ "I want to buy shoes"
-→ "I'm specialized in electronics & tech — laptops, phones, headphones, cameras, and accessories!
-   I can't help with "shoes" unfortunately. But I can help you find the perfect tech setup!"
-```
-
-**Blocked categories:** Clothing, food/grocery, furniture, cosmetics, books/stationery, toys, kitchenware, sports equipment, medicine, jewellery, vehicles.
-
-### Intent Misclassification Prevention
-
-| User Says                     | Correct Intent                         | Wrong Intent (prevented) |
-| ----------------------------- | -------------------------------------- | ------------------------ |
-| "I want to buy Galaxy S22"    | `product_search` (keyword: Galaxy S22) | ~~add_to_cart~~          |
-| "I'm a student, need a setup" | `bundle_advisor`                       | ~~product_search~~       |
-| "Add all to cart"             | `add_to_cart` (bulk)                   | ~~unknown~~              |
-| "Show me shoes"               | Guardrail redirect                     | ~~product_search~~       |
+- **Line-Item Snapshots**: Joined `orderItemsTable` with `productsTable` returning product name, brand, category, thumbnail image, unit price, and quantity.
+- **Live Shipment Stepper**: 4-stage tracking pipeline (`Order Placed` ➔ `Confirmed` ➔ `Shipped` ➔ `Delivered`).
+- **Authoritative Financial Breakdown**: Displays Subtotal, Product Markdowns, **Applied Coupon Code Badge & Savings Snapshot**, Free Shipping, and Total Paid.
+- **1-Click Printable Tax Invoice**: Modal generating a clean, printable tax invoice (`#INV-5`) with full billing info.
 
 ---
 
-## Frontend Integration
-
-### AIChatbot Component
-
-```mermaid
-flowchart LR
-    Input[User Types / Clicks Chip] --> Mutation[useMutation<br/>POST /api/ai/chat]
-    Mutation --> Parse[Parse Response]
-    Parse --> Msg[Render Message Bubble]
-    Parse --> Products[Render Product Cards<br/>with Add to Cart buttons]
-    Parse --> Orders[Render Order Cards<br/>with status badges]
-    Parse --> Login[Render Login Button<br/>if requiresLogin]
-    Parse --> Chips[Render Follow-up Chips<br/>only on last message]
-    Chips -->|onClick| Input
-```
-
-**Key Features:**
-
-- Sends last 8 messages as `history[]` for context
-- Follow-up chips only render on the **most recent** AI message
-- Product cards have inline "Add to Cart" buttons
-- Order cards link to `/orders` page
-- Login buttons link to `/login` page
-- Bundle responses show total price + "Add all to cart" chip
-
----
-
-## Data Flow: User Context Loading
-
-```mermaid
-flowchart TD
-    Cookie[🍪 session_user_id cookie] --> Parse[Parse userId]
-    Parse --> Query1[Query users table → name]
-    Parse --> Query2[Query orders + order_items + products<br/>JOIN last 20 items]
-
-    Query2 --> Extract[Extract from results:]
-    Extract --> Categories[📂 interests = unique categories]
-    Extract --> Brands[🏷️ purchasedBrands = unique brands]
-    Extract --> IDs[🔢 purchasedProductIds = product IDs]
-    Extract --> Orders[📦 recentOrders = last 3 orders]
-    Extract --> Address[📍 lastAddress = shipping info]
-
-    Categories --> UC[UserContext Object]
-    Brands --> UC
-    IDs --> UC
-    Orders --> UC
-    Address --> UC
-    Query1 --> UC
-```
-
----
-
-## Example Conversations
-
-### 📚 "I'm a student, want to buy good for me" (Bundle Flow)
-
-| Turn | User                                     | Agent         | Response                                                                                                        |
-| ---- | ---------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------- |
-| 1    | "I am a student want to buy good for me" | BundleAdvisor | "📚 Got it! I'll build a student bundle. What's your budget?" + chips: `Under ₹30k` `₹50k` `₹80k` `No limit`    |
-| 2    | "Around ₹50,000"                         | BundleAdvisor | Shows 3-item bundle (Laptop ₹35k + Headphones ₹4k + Mouse ₹2k) = ₹41k ✅ within budget + "Add all to cart" chip |
-| 3    | "Add all to cart"                        | AddToCart     | ✅ Added 3 items to cart! Total: ₹41,000 + chips: `Checkout` `More accessories`                                 |
-
-### 🎮 "I need a gaming setup" (Bundle Flow)
-
-| Turn | User                          | Agent         | Response                                                     |
-| ---- | ----------------------------- | ------------- | ------------------------------------------------------------ |
-| 1    | "I need a gaming setup"       | BundleAdvisor | "🎮 Got it! I'll build a gaming bundle. What's your budget?" |
-| 2    | "₹1 lakh"                     | BundleAdvisor | Shows Gaming Laptop + Gaming Headset + Gaming Mouse bundle   |
-| 3    | "Swap the laptop for cheaper" | BundleAdvisor | Shows updated bundle with budget laptop                      |
-
-### 🔍 "I want Galaxy S22" (Specific Product Search)
-
-| Turn | User                       | Agent         | Response                                                             |
-| ---- | -------------------------- | ------------- | -------------------------------------------------------------------- |
-| 1    | "I want to buy Galaxy S22" | ProductSearch | Cascading search: keyword "Galaxy S22" → Samsung phones matching S22 |
-| 2    | "Under ₹30,000"            | ProductSearch | Filtered by price + chips: `Add best to cart` `Show alternatives`    |
-| 3    | "Add best to cart"         | AddToCart     | ✅ Added! + chips: `More Mobiles` `Accessories` `Checkout`           |
-
-### 👟 "I want shoes" (Guardrail)
-
-| Turn | User                  | Agent         | Response                                                                                                                                                |
-| ---- | --------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1    | "I want to buy shoes" | BundleAdvisor | "I'm specialized in electronics & tech! Can't help with shoes. What do you use technology for?" + chips: `I need a laptop` `Best phone` `I'm a student` |
-
----
-
-## Technology Stack
-
-| Layer    | Technology                                       |
-| -------- | ------------------------------------------------ |
-| AI Model | Google Gemini 1.5 Flash (structured JSON output) |
-| Backend  | Express 5.x + TypeScript                         |
-| Database | PostgreSQL + Drizzle ORM                         |
-| Frontend | React 18 + TanStack Query + Tailwind CSS         |
-| Routing  | wouter (frontend), Express Router (backend)      |
-| Monorepo | pnpm workspaces                                  |
-
----
-
-## Security & Guards
+## Security & Safety
 
 - **Login gates**: Orders, Address, AddToCart require authentication
-- **Session isolation**: Cart uses `user_{id}` session IDs
+- **Session isolation**: Cart uses `user_{id}` or `default` session IDs
 - **Input validation**: Message required, history capped at 8 entries
-- **API key fallback**: Works without Gemini API key via local parser
+- **Provider fallback**: Works seamlessly without an API key using the local regex/keyword parser
 - **No PII in logs**: Only intent name + agent name logged
-- **Non-electronics guardrail**: Blocks out-of-domain requests gracefully
-- **Intent protection**: "buy X" ≠ add_to_cart, prevents wrong cart additions
-
----
-
-## Build & Run
-
-```bash
-# Build API server
-cd artifacts/api-server && pnpm run build
-
-# Start server
-node --enable-source-maps --import ./dist/preload.mjs ./dist/index.mjs
-
-# Or use run-local.ps1 option 7
-```
-
-**
+- **Non-electronics guardrail**: Gracefully blocks out-of-domain requests

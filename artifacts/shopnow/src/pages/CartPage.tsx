@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { AppLayout } from '../components/AppLayout';
 import { AnonymousRecommendationWidget } from '../components/AnonymousRecommendationWidget';
+import { CouponBox } from '../components/CouponBox';
 import {
   useGetCart,
   useUpdateCartItem,
@@ -29,6 +30,10 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useUser } from '../context/UserContext';
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
 
 interface ShippingAddress {
   name: string;
@@ -42,9 +47,29 @@ interface ShippingAddress {
 export default function CartPage() {
   const queryClient = useQueryClient();
   const { isLoggedIn, userName } = useUser();
+  const [isEmptyingCart, setIsEmptyingCart] = useState(false);
   const { data: cart, isLoading: isCartLoading } = useGetCart({
     query: { queryKey: getGetCartQueryKey() },
   });
+
+  const handleEmptyCart = async () => {
+    if (!cart?.items?.length) return;
+    setIsEmptyingCart(true);
+    try {
+      const res = await fetch('/api/cart/items', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (res.ok) {
+        await queryClient.invalidateQueries({ queryKey: getGetCartQueryKey() });
+        await queryClient.refetchQueries({ queryKey: getGetCartQueryKey() });
+      }
+    } catch (err) {
+      console.error('Failed to empty cart:', err);
+    } finally {
+      setIsEmptyingCart(false);
+    }
+  };
 
   const LS_KEY = 'shopnow_saved_address';
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -144,9 +169,31 @@ export default function CartPage() {
     <AppLayout activePage="cart">
       <div className="bg-[#f8f9fb] dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-screen pb-24 transition-colors">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-6">
-            Shopping Cart
-          </h1>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
+                Shopping Cart
+              </h1>
+              {hasItems && (
+                <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/50 px-2.5 py-0.5 rounded-full">
+                  {cart.items.length} {cart.items.length === 1 ? 'item' : 'items'}
+                </span>
+              )}
+            </div>
+
+            {hasItems && (
+              <button
+                onClick={handleEmptyCart}
+                disabled={isEmptyingCart}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60 hover:border-red-300 dark:hover:border-red-800 transition-all font-semibold text-xs shadow-xs hover:shadow active:scale-95 disabled:opacity-50 cursor-pointer"
+                title="Remove all items from your cart"
+                data-testid="btn-empty-cart"
+              >
+                <Trash2 size={14} className={isEmptyingCart ? 'animate-bounce' : ''} />
+                {isEmptyingCart ? 'Emptying Cart...' : 'Empty Cart'}
+              </button>
+            )}
+          </div>
 
           {hasItems ? (
             <div className="flex flex-col lg:flex-row gap-8">
@@ -160,12 +207,10 @@ export default function CartPage() {
                   >
                     <div className="w-32 h-32 bg-gray-50 dark:bg-slate-800/80 rounded-lg border border-gray-100 dark:border-slate-800 flex items-center justify-center p-2">
                       <img
-                        src={
-                          item.product.imageUrl ||
-                          `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`
-                        }
+                        src={resolveProductImageSrc(item.product.imageUrl, item.product.name)}
                         alt={item.product.name}
                         className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                        onError={(e) => onProductImageError(e, item.product.name)}
                       />
                     </div>
                     <div className="flex-1 flex flex-col">
@@ -440,7 +485,7 @@ export default function CartPage() {
                       {cart.discount > 0 && (
                         <div className="flex justify-between">
                           <span>
-                            Discount{' '}
+                            Coupon discount{' '}
                             {cart.couponApplied
                               ? `(${cart.couponApplied})`
                               : ''}
@@ -459,6 +504,13 @@ export default function CartPage() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Coupon entry */}
+                    <CouponBox
+                      couponApplied={cart.couponApplied ?? null}
+                      couponInfo={(cart as any).couponInfo}
+                      discount={cart.discount}
+                    />
 
                     <div className="border-t border-gray-100 dark:border-slate-800 pt-3 pb-1 mb-2">
                       <div className="flex justify-between items-center">
@@ -575,11 +627,9 @@ export default function CartPage() {
                     >
                       <div className="w-20 h-20 bg-white rounded-lg p-2 flex-shrink-0 flex items-center justify-center">
                         <img
-                          src={
-                            rec.product.imageUrl ||
-                            `${import.meta.env.BASE_URL}images/headphones.jpg`
-                          }
+                          src={resolveProductImageSrc(rec.product.imageUrl)}
                           className="w-full h-full object-contain mix-blend-multiply"
+                          onError={onProductImageError}
                         />
                       </div>
                       <div className="flex-1">
@@ -628,11 +678,9 @@ export default function CartPage() {
                       >
                         <div className="w-16 h-16 bg-gray-50 dark:bg-slate-800/80 rounded flex items-center justify-center p-1">
                           <img
-                            src={
-                              rec.product.imageUrl ||
-                              `${import.meta.env.BASE_URL}images/usb-hub.jpg`
-                            }
+                            src={resolveProductImageSrc(rec.product.imageUrl)}
                             className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                            onError={onProductImageError}
                           />
                         </div>
                         <div className="flex-1 flex flex-col justify-center">
@@ -677,11 +725,9 @@ export default function CartPage() {
                       >
                         <div className="w-16 h-16 bg-gray-50 dark:bg-slate-800/80 rounded flex items-center justify-center p-1">
                           <img
-                            src={
-                              rec.product.imageUrl ||
-                              `${import.meta.env.BASE_URL}images/ssd.jpg`
-                            }
+                            src={resolveProductImageSrc(rec.product.imageUrl)}
                             className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal"
+                            onError={onProductImageError}
                           />
                         </div>
                         <div className="flex-1">

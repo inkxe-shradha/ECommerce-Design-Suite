@@ -11,6 +11,7 @@ import SignupPage from './pages/SignupPage';
 import CheckoutPage from './pages/CheckoutPage';
 import OrderSuccessPage from './pages/OrderSuccessPage';
 import OrderHistoryPage from './pages/OrderHistoryPage';
+import OrderDetailPage from './pages/OrderDetailPage';
 import SearchResultsPage from './pages/SearchResultsPage';
 import CategoryPage from './pages/CategoryPage';
 import { UserProvider } from './context/UserContext';
@@ -42,6 +43,8 @@ function Router() {
       <Route path="/checkout" component={CheckoutPage} />
       <Route path="/order-success" component={OrderSuccessPage} />
       <Route path="/orders" component={OrderHistoryPage} />
+      <Route path="/orders/:id" component={OrderDetailPage} />
+      <Route path="/order/:id" component={OrderDetailPage} />
       <Route component={NotFound} />
     </Switch>
   );

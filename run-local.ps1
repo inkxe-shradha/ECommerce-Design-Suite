@@ -59,7 +59,7 @@ function Show-DbDiagnostics {
 function Show-Menu {
     Write-Host ""
     Write-Host "Please select an option:" -ForegroundColor Yellow
-    Write-Host "1) Start Express API Server (Port $apiPort)"
+    Write-Host "1) Start Express API Server (Watch Mode, Port $apiPort)"
     Write-Host "2) Start ShopNow React Storefront (Port $shopPort)"
     Write-Host "3) Start Mockup Sandbox (Port $sandboxPort)"
     Write-Host "4) Run Database Schema Push (requires DATABASE_URL)"
@@ -85,7 +85,7 @@ do {
     
     switch ($choice) {
         "1" {
-            Write-Host "Starting Express API Server..." -ForegroundColor Green
+            Write-Host "Starting Express API Server in watch mode..." -ForegroundColor Green
             $env:PORT = $apiPort
             $env:NODE_ENV = "development"
             
@@ -94,8 +94,8 @@ do {
             if ($userInputDb) { $dbUrl = $userInputDb }
             $env:DATABASE_URL = $dbUrl
             
-            Write-Host "Starting on http://localhost:$apiPort (using DATABASE_URL: $dbUrl)" -ForegroundColor Gray
-            npx pnpm --filter @workspace/api-server start
+            Write-Host "Starting on http://localhost:$apiPort and restarting after API source changes..." -ForegroundColor Gray
+            npx pnpm --filter @workspace/api-server run dev
             break
         }
         "2" {

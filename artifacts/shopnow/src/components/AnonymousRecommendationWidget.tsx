@@ -3,6 +3,10 @@ import { Link } from "wouter";
 import { TrendingUp, BookOpen, Star, ShoppingCart } from "lucide-react";
 import { Product, useAddToCart, getGetCartQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
 
 interface AnonymousWidgetProps {
   title: string;
@@ -47,20 +51,30 @@ export function AnonymousRecommendationWidget({
     }).format(price);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8" data-testid={`anon-widget-${badgeVariant}`}>
+    <div
+      className="max-w-7xl mx-auto px-6 py-8"
+      data-testid={`anon-widget-${badgeVariant}`}
+    >
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-1">{title}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-1">
+            {title}
+          </h2>
           <div
             className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${badgeClass}`}
           >
             <Icon size={12} /> {badge}
           </div>
         </div>
-        <p className="text-sm text-gray-500 dark:text-slate-400 hidden md:block">{subtitle}</p>
+        <p className="text-sm text-gray-500 dark:text-slate-400 hidden md:block">
+          {subtitle}
+        </p>
       </div>
 
-      <div className="flex gap-5 overflow-x-auto pb-4" style={{ scrollbarWidth: "none" }}>
+      <div
+        className="flex gap-5 overflow-x-auto pb-4"
+        style={{ scrollbarWidth: 'none' }}
+      >
         {products.map((product) => (
           <Link
             key={product.id}
@@ -76,9 +90,10 @@ export function AnonymousRecommendationWidget({
               )}
               <div className="h-36 bg-gray-50 dark:bg-slate-800/80 rounded-lg flex items-center justify-center overflow-hidden p-2">
                 <img
-                  src={product.imageUrl || `${import.meta.env.BASE_URL}images/dell-xps-15.jpg`}
+                  src={resolveProductImageSrc(product.imageUrl)}
                   alt={product.name}
                   className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-300"
+                  onError={onProductImageError}
                 />
               </div>
             </div>
@@ -92,12 +107,18 @@ export function AnonymousRecommendationWidget({
 
             <div className="flex items-center gap-1 mb-2">
               <Star size={11} className="text-amber-500 fill-amber-500" />
-              <span className="text-xs font-medium text-gray-700 dark:text-slate-300">{product.rating}</span>
-              <span className="text-[10px] text-gray-400 dark:text-slate-500">({product.reviewCount.toLocaleString()})</span>
+              <span className="text-xs font-medium text-gray-700 dark:text-slate-300">
+                {product.rating}
+              </span>
+              <span className="text-[10px] text-gray-400 dark:text-slate-500">
+                ({product.reviewCount.toLocaleString()})
+              </span>
             </div>
 
             <div className="flex items-baseline gap-2 mb-3 mt-auto">
-              <span className="font-bold text-gray-900 dark:text-indigo-400">{formatPrice(product.price)}</span>
+              <span className="font-bold text-gray-900 dark:text-indigo-400">
+                {formatPrice(product.price)}
+              </span>
               {product.originalPrice && (
                 <span className="text-xs text-gray-400 dark:text-slate-500 line-through">
                   {formatPrice(product.originalPrice)}

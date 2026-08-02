@@ -38,4 +38,20 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 
+app.use(
+  (
+    err: any,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    logger.error({ err }, "Unhandled Express API error");
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: err?.message || "An unexpected error occurred",
+      cause: err?.cause?.message || (err?.cause ? String(err.cause) : undefined),
+    });
+  },
+);
+
 export default app;

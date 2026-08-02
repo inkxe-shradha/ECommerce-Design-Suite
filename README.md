@@ -17,34 +17,27 @@
 - **Modern E-Commerce UI**: Built with React 19, Tailwind CSS v4, Radix UI primitives, Lucide icons, and Framer Motion micro-animations.
 - **Product Discovery**: Fast full-text product search, category filters, price sliders, time-limited flash deals, and sort parameters (`price`, `rating`, `newest`).
 - **Interactive Product Detail Pages (PDP)**: High-res image gallery with thumbnail switches, dynamic inventory badges, specifications grid, and verified customer star reviews.
-- **Seamless Cart & Checkout**: Slide-out drawer & full cart view, promo code support, address modal, instant order placement, and order confirmation.
-- **User Dashboard & Order History**: User registration with salted password hashing, profile session management, itemized order tracking, and receipt views.
+- **Seamless Cart & Checkout**: Slide-out drawer & full cart view, promo code support (`BUILD50K`, `TECH20`, `GAMING10`), address modal, instant order placement, and order confirmation.
+- **Dedicated Order Details & Tax Invoice System (`/order/:id`)**: Detailed line-item product cards, 4-stage live shipment tracker, price breakdown with promo coupon savings, and 1-click **Printable Tax Invoice Modal (`#INV-5`)**.
 
 ### 🤖 2. Multi-Agent AI Shopping Assistant
-- **Agentic Router System**: An intelligent AI Chatbot (`AIChatbot.tsx`) powered by specialized backend sub-agents:
-  - 🔍 **Product Search Agent**: Finds products matching specific specifications or budgets.
-  - 🎁 **Bundle Advisor Agent**: Recommends complementary accessories and deal packages.
-  - 📦 **Order Tracking Agent**: Looks up status and items for historical user orders.
+- **Agentic Router & Supervisor System**: An intelligent AI Chatbot (`AIChatbot.tsx`) powered by specialized backend sub-agents:
+  - 📱 **Guided Product Advisor Agent**: Multi-turn 3-phase guided consultation engine for Mobiles, Laptops, Audio, Cameras, and Accessories (Phase 1: Use Case ➔ Phase 2: Budget Range ➔ Phase 3: #1 Best Match).
+  - 🎮 **Gaming PC Build Advisor Agent**: Full 8-component rig selection, stockpile brand chooser (`ASUS`, `MSI`, `Gigabyte`, `Zotac`, `Corsair`, `NZXT`), and inline coupon savings calculator.
+  - 💡 **Self-Correction & Error Recovery Engine**: Intercepts user feedback, prepends empathetic acknowledgments, and provides fault-tolerant try-catch fallbacks.
+  - 🔍 **Product Search Agent**: Cascading catalog search with keyword intelligence.
+  - 📦 **Order Tracking Agent**: Looks up status and line items for historical user orders.
   - ⚖️ **Comparison Agent**: Side-by-side feature comparisons between electronics.
-  - ⭐ **Top Picks Agent**: Curates highest-rated trending tech items.
-- **Rich Markdown Formatting**: Answers include custom Markdown rendering (`MarkdownMessage.tsx`) with formatted tables, bold key features, and inline product links.
 
 ### 🎯 3. Personalization & Recommendation Engine
-- **Homepage Widgets**: Dynamic carousels for *Trending Tech*, *Best Sellers*, and *Personalized For You*.
-- **PDP Widgets**: *Frequently Bought Together* product bundles and content-based alternatives.
-- **Cart Widgets**: Real-time cross-sell recommendations tailored to current cart line items.
-- **Anonymous & Logged-In Modes**: Gracefully falls back to top-rated accessories when users browse anonymously.
+- **Session-Aware Dynamic Widgets**: Dynamic carousels for `${firstName}'s Personal AI Preferences`, *Based on Your Tech Interests*, and *Trending Among Similar Shoppers*.
+- **PDP & Cart Widgets**: *Frequently Bought Together* product bundles and real-time cross-sell recommendations.
 
 ### 🔄 4. Contract-First API & Codegen Pipeline
 - **OpenAPI 3.1 Single Source of Truth**: Endpoints, parameters, schemas, and responses are declared in [`lib/api-spec/openapi.yaml`](file:///c:/My%20Projects/ECommerce-Design-Suite/ECommerce-Design-Suite/lib/api-spec/openapi.yaml).
 - **Automated Orval Codegen**:
   - Generates Zod validation rules (`@workspace/api-zod`) for Express 5 backend routes.
   - Generates TanStack React Query hooks (`@workspace/api-client-react`) for type-safe frontend fetch calls.
-- **Zero API Drift**: Request payloads that deviate from OpenAPI specs are caught instantly at compile-time and runtime.
-
-### 🎨 5. Isolated Mockup Preview Sandbox
-- **Visual Design Canvas**: A dedicated Vite environment (`artifacts/mockup-sandbox`) designed for UI/UX developers to test design mockups without database dependencies.
-- **Hot-Reloading Mockup Scanner**: Custom Vite plugin (`mockupPreviewPlugin.ts`) dynamically scans mockup directories and generates preview routes on-the-fly.
 
 ---
 
@@ -62,7 +55,8 @@ ECommerce-Design-Suite/
 │   ├── api-client-react/       # Auto-generated React Query hooks with custom fetcher
 │   └── db/                     # Drizzle ORM PostgreSQL connection pool & schemas
 ├── docs/                       # Architecture documents & implementation checklists
-├── ARCHITECTURE.md             # In-depth system architecture guide
+│   ├── AGENTIC-AI-ARCHITECTURE.md # Detailed Agentic AI system specification
+│   └── ARCHITECTURE.md          # Full system architecture guide
 └── replit.md                   # Workspace operating instructions & repo map
 ```
 
@@ -78,7 +72,7 @@ ECommerce-Design-Suite/
 | **Contract & Validation** | OpenAPI 3.1, Orval, Zod | End-to-end code generation and runtime validation |
 | **Frontend Framework** | React 19, Vite, TanStack Query v5 | Modern UI rendering with automatic server-state caching |
 | **Styling & UI** | Tailwind CSS v4, Radix UI, Lucide | Responsive design system & accessible primitives |
-| **AI Integration** | Google GenAI SDK (Gemini) | Multi-agent AI shopping assistant system |
+| **AI Integration** | Agentic Multi-Agent Framework | Multi-agent AI shopping assistant system |
 
 ---
 
@@ -97,10 +91,9 @@ pnpm install
 ```
 
 ### 2. Environment Configuration
-Create a `.env` file in the root directory (never committed to version control):
+Create a `.env` file in the root directory:
 ```env
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/ecommerce
-GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 ### 3. Database Migration & Seeding
@@ -133,14 +126,6 @@ pnpm --filter @workspace/mockup-sandbox run dev
 | `pnpm run typecheck` | Executes TypeScript type verification across all workspaces |
 | `pnpm run build` | Compiles production builds for all apps and shared libraries |
 | `pnpm --filter @workspace/api-spec run codegen` | Re-syncs React Query hooks & Zod schemas from `openapi.yaml` |
-
----
-
-## 🔒 Security & Best Practices
-
-- **Zero Secret Exposure**: All API keys and connection strings are managed strictly via environment variables (`.env` is excluded via `.gitignore`).
-- **Input Sanitization**: Request bodies are validated using strict Zod schemas before hitting business logic.
-- **Salted Password Hashing**: User authentication utilizes cryptographic salt & hashing routines to secure credentials.
 
 ---
 

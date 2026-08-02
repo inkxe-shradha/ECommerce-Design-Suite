@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
-import { useProcessCheckout, useGetCart } from '@workspace/api-client-react';
+import {
+  getGetCartQueryKey,
+  useGetCart,
+  useProcessCheckout,
+} from '@workspace/api-client-react';
 import {
   ShoppingCart,
   MapPin,
@@ -13,6 +17,11 @@ import {
 } from 'lucide-react';
 import { useUser } from '../context/UserContext';
 import { AppLayout } from '../components/AppLayout';
+import {
+  onProductImageError,
+  resolveProductImageSrc,
+} from '../lib/product-image';
+import { CouponBox } from '../components/CouponBox';
 
 const LS_KEY = 'shopnow_saved_address';
 
@@ -87,7 +96,9 @@ export default function CheckoutPage() {
   const [, setLocation] = useLocation();
   const { user, isLoggedIn } = useUser();
   const checkoutMutation = useProcessCheckout();
-  const { data: cart, isLoading: isCartLoading } = useGetCart();
+  const { data: cart, isLoading: isCartLoading } = useGetCart({
+    query: { queryKey: getGetCartQueryKey() },
+  });
 
   // Redirect to login if not signed in
   if (!isLoggedIn) {
@@ -236,11 +247,12 @@ export default function CheckoutPage() {
                         key={item.product.id}
                         className="flex items-center gap-4 py-3"
                       >
-                        <div className="w-16 h-16 bg-neutral-50 dark:bg-neutral-900 rounded-lg flex items-center justify-center p-2 border border-neutral-100 dark:border-neutral-700 flex-shrink-0">
+                        <div className="w-16 h-16 bg-neutral-50 dark:bg-neutral-900 rounded-lg flex items-center justify-center p-2 border border-neutral-100 dark:border-neutral-700 shrink-0">
                           <img
-                            src={item.product.imageUrl || ''}
+                            src={resolveProductImageSrc(item.product.imageUrl, item.product.name)}
                             alt={item.product.name}
                             className="w-full h-full object-contain"
+                            onError={(e) => onProductImageError(e, item.product.name)}
                           />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -251,7 +263,7 @@ export default function CheckoutPage() {
                             {item.product.brand} · Qty: {item.quantity}
                           </p>
                         </div>
-                        <div className="text-sm font-bold text-right flex-shrink-0">
+                        <div className="text-sm font-bold text-right shrink-0">
                           {formatPrice(item.product.price * item.quantity)}
                         </div>
                       </div>
@@ -277,6 +289,13 @@ export default function CheckoutPage() {
                         </span>
                       </div>
                     )}
+                    <div className="pt-2">
+                      <CouponBox
+                        couponApplied={(cart as any).couponApplied}
+                        couponInfo={(cart as any).couponInfo}
+                        discount={(cart as any).discount || 0}
+                      />
+                    </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-neutral-500 dark:text-neutral-400">
                         Delivery
@@ -514,7 +533,7 @@ export default function CheckoutPage() {
               <button
                 type="button"
                 onClick={() => setStep('review')}
-                className="flex-shrink-0 px-6 py-4 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-semibold rounded-xl transition-colors flex items-center gap-2 border border-neutral-200 dark:border-neutral-700"
+                className="shrink-0 px-6 py-4 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-semibold rounded-xl transition-colors flex items-center gap-2 border border-neutral-200 dark:border-neutral-700"
               >
                 <ArrowLeft size={16} /> Back
               </button>

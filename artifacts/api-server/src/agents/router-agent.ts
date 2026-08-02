@@ -1,5 +1,5 @@
-import { GoogleGenAI, Type } from '@google/genai';
 import type { AgentContext, ParsedIntent, UserContext } from './types.js';
+import { getAIProvider, type StructuredSchema } from './ai-provider.js';
 
 const GREETINGS = [
   'hi',
@@ -30,158 +30,38 @@ const BRANDS: Array<{ name: string; category?: string }> = [
   { name: 'Asus', category: 'Laptops' },
 ];
 
-const DEFAULT_GEMINI_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-3-flash-preview',
-  'gemini-flash-latest',
-  'gemini-2.0-flash',
-];
+const INTENT_SCHEMA: StructuredSchema = {
+  type: 'object',
+  properties: {
+    isGreeting: { type: 'boolean' },
+    intent: { type: 'string' },
+    category: { type: 'string', nullable: true },
+    maxPrice: { type: 'number', nullable: true },
+    minPrice: { type: 'number', nullable: true },
+    keyword: { type: 'string', nullable: true },
+    brands: {
+      type: 'array',
+      items: { type: 'string' },
+      nullable: true,
+    },
+    sortByPrice: {
+      type: 'string',
+      nullable: true,
+      description: '"asc" or "desc"',
+    },
+    sortByRating: {
+      type: 'boolean',
+      nullable: true,
+      description: 'true when user wants best/top rated products',
+    },
+    reply: { type: 'string', description: 'Conversational reply' },
+  },
+};
 
-const GEMINI_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
-let cachedGeminiModels: { models: string[]; expiresAt: number } | null = null;
-
-const NON_TEXT_MODEL_PATTERN =
-  /(?:tts|image|lyria|robotics|deep-research|nano-banana|computer-use|antigravity)/i;
-
-const ROUTER_MODEL_PATTERN = /^gemini-(?:\d+(?:\.\d+)?-)?flash(?:-|$)/i;
-
-export interface GeminiAvailability {
-  available: boolean;
-  model?: string;
-  checkedModels: string[];
-  availableModels?: string[];
-  modelErrors?: Record<string, string>;
-  error?: string;
-}
-
-function getConfiguredGeminiModels(): string[] {
-  return [process.env.GEMINI_MODEL, ...DEFAULT_GEMINI_MODELS]
-    .filter((model): model is string => Boolean(model))
-    .filter((model, index, models) => models.indexOf(model) === index);
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Unknown Gemini API error';
-}
-
-async function discoverGeminiModels(apiKey: string): Promise<string[]> {
-  if (cachedGeminiModels && cachedGeminiModels.expiresAt > Date.now()) {
-    return cachedGeminiModels.models;
-  }
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`,
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Gemini model discovery failed with HTTP ${response.status}`,
-    );
-  }
-
-  const data = (await response.json()) as {
-    models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
-  };
-  const models = (data.models ?? [])
-    .filter((model) =>
-      model.supportedGenerationMethods?.includes('generateContent'),
-    )
-    .map((model) => model.name?.replace(/^models\//, ''))
-    .filter((model): model is string => Boolean(model))
-    .filter(
-      (model) =>
-        !NON_TEXT_MODEL_PATTERN.test(model) && ROUTER_MODEL_PATTERN.test(model),
-    );
-
-  cachedGeminiModels = {
-    models,
-    expiresAt: Date.now() + GEMINI_MODELS_CACHE_TTL_MS,
-  };
-  return models;
-}
-
-async function getGeminiModels(apiKey: string): Promise<string[]> {
-  const configuredModels = getConfiguredGeminiModels();
-  try {
-    const availableModels = await discoverGeminiModels(apiKey);
-    const preferredAvailableModels = configuredModels.filter((model) =>
-      availableModels.includes(model),
-    );
-    return [...preferredAvailableModels, ...availableModels].filter(
-      (model, index, models) => models.indexOf(model) === index,
-    );
-  } catch (error) {
-    console.warn('[RouterAgent] Gemini model discovery failed:', error);
-    return configuredModels;
-  }
-}
-
-export async function checkGeminiAvailability(): Promise<GeminiAvailability> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  const configuredModels = getConfiguredGeminiModels();
-
-  if (!apiKey) {
-    return {
-      available: false,
-      checkedModels: configuredModels,
-      error: 'GEMINI_API_KEY is not configured',
-    };
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-  let availableModels: string[] | undefined;
-  let checkedModels = configuredModels;
-  try {
-    availableModels = await discoverGeminiModels(apiKey);
-    checkedModels = await getGeminiModels(apiKey);
-  } catch (error) {
-    return {
-      available: false,
-      checkedModels,
-      error: getErrorMessage(error),
-    };
-  }
-  let lastError = 'No configured Gemini model responded';
-  const modelErrors: Record<string, string> = {};
-
-  for (const model of checkedModels) {
-    try {
-      await ai.models.generateContent({
-        model,
-        contents: 'Return a JSON object confirming availability.',
-        config: {
-          maxOutputTokens: 16,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              available: { type: Type.BOOLEAN },
-            },
-          },
-        },
-      });
-      return {
-        available: true,
-        model,
-        checkedModels,
-        availableModels,
-        modelErrors,
-      };
-    } catch (error) {
-      lastError = getErrorMessage(error);
-      modelErrors[model] = lastError;
-    }
-  }
-
-  return {
-    available: false,
-    checkedModels,
-    availableModels,
-    modelErrors,
-    error: lastError,
-  };
-}
-
-function localFallbackParse(message: string): ParsedIntent {
+function localFallbackParse(
+  message: string,
+  history?: Array<{ role: string; content: string }>,
+): ParsedIntent {
   const lower = message.trim().toLowerCase();
 
   const isGreeting = GREETINGS.some(
@@ -192,7 +72,150 @@ function localFallbackParse(message: string): ParsedIntent {
     return { isGreeting: true, intent: 'greeting', reply: '' };
   }
 
-  // Add-to-cart intent (only when explicitly about cart, not "I want to buy X")
+  // Extract last assistant message for active continuation tracking
+  const lastAssistantMsg = [...(history || [])]
+    .reverse()
+    .find((h) => h.role === 'assistant');
+  const lastContentLower = (lastAssistantMsg?.content || '').toLowerCase();
+
+  // ── Active Guided Consultation continuation (checked FIRST before PC build) ──
+  const isGuidedAdvisorActive =
+    lastContentLower.includes('primary use case for your new') ||
+    lastContentLower.includes('target budget for your') ||
+    lastContentLower.includes('which product category are you looking for') ||
+    lastContentLower.includes('sound experience are you looking for') ||
+    lastContentLower.includes('photography will you primarily do') ||
+    lastContentLower.includes('electronics match') ||
+    lastContentLower.includes('best recommended mobile') ||
+    lastContentLower.includes('best recommended laptop') ||
+    lastContentLower.includes('best recommended audio') ||
+    lastContentLower.includes('best recommended camera') ||
+    lastContentLower.includes('best recommended tv') ||
+    lastContentLower.includes('best recommended tablet') ||
+    lastContentLower.includes('what will you primarily use your new tv') ||
+    lastContentLower.includes('what will you primarily use your new tablet') ||
+    lastContentLower.includes('what is your primary use case for your new');
+
+  if (isGuidedAdvisorActive) {
+    return { isGreeting: false, intent: 'guided_advisor', reply: '' };
+  }
+
+  // ── Active Gaming PC build continuation ──────────────────────────────────
+  const isGamingBuildActive =
+    lastContentLower.includes('gaming pc') ||
+    lastContentLower.includes('pc build') ||
+    lastContentLower.includes('primary workload') ||
+    lastContentLower.includes('what will you primarily use this pc') ||
+    lastContentLower.includes('processor brand preference') ||
+    lastContentLower.includes('graphics card (gpu) brand preference') ||
+    lastContentLower.includes('let ai decide') ||
+    lastContentLower.includes('target display') ||
+    lastContentLower.includes('target monitor resolution') ||
+    lastContentLower.includes('resolution goal') ||
+    (lastContentLower.includes('total target budget') &&
+      !lastContentLower.includes('for your new')) ||
+    lastContentLower.includes('components selected') ||
+    lastContentLower.includes('component breakdown') ||
+    (lastContentLower.includes('ready to add') &&
+      lastContentLower.includes('components')) ||
+    lastContentLower.includes('coupon savings');
+
+  if (isGamingBuildActive) {
+    return { isGreeting: false, intent: 'gaming_build', reply: '' };
+  }
+
+  // ── Compare intent fast-path ─────────────────────────────────────────────
+  if (
+    lower.includes(' vs ') ||
+    lower.includes(' versus ') ||
+    lower.startsWith('compare ') ||
+    (lower.includes('compare') && lower.includes(' and ')) ||
+    (lower.includes('difference between') && (lower.includes('and') || lower.includes('vs')))
+  ) {
+    return { isGreeting: false, intent: 'compare', reply: '' };
+  }
+
+  // ── Return/Refund/Exchange intent ────────────────────────────────────────
+  if (
+    lower.includes('return') ||
+    lower.includes('refund') ||
+    lower.includes('exchange') ||
+    lower.includes('cancel my order') ||
+    lower.includes('cancellation') ||
+    lower.includes('damaged') ||
+    lower.includes('wrong item') ||
+    lower.includes('replace my') ||
+    lower.includes('replacement')
+  ) {
+    return { isGreeting: false, intent: 'orders', reply: 'return' };
+  }
+
+  // ── Specific PC Build triggers override guided advisor ───────────────────
+  if (
+    lower.includes('pc build') ||
+    lower.includes('build a pc') ||
+    lower.includes('build pc') ||
+    lower.includes('gaming rig') ||
+    lower.includes('gaming pc') ||
+    lower.includes('assemble pc') ||
+    lower.includes('assemble a pc')
+  ) {
+    return { isGreeting: false, intent: 'gaming_build', reply: '' };
+  }
+
+  // ── Guided Product Advisor triggers ──────────────────────────────────────
+  const guidedAdvisorTriggers = [
+    'help me to pick',
+    'help me pick',
+    'help me choose',
+    'help me select',
+    'pick up best',
+    'pick best',
+    'choose best',
+    'which mobile',
+    'which phone',
+    'which laptop',
+    'which headphone',
+    'which camera',
+    'which tv',
+    'which tablet',
+    'recommend a mobile',
+    'recommend a phone',
+    'recommend a laptop',
+    'recommend a tv',
+    'suggest a mobile',
+    'suggest a phone',
+    'suggest a laptop',
+    'suggest a tv',
+    'guide me to buy',
+    'guide me to choose',
+    'what is the best mobile',
+    'what is the best phone',
+    'what is the best laptop',
+    'what is the best tv',
+    'best mobil',
+    'best mobile',
+    'best tv',
+    'best tablet',
+  ];
+  if (guidedAdvisorTriggers.some((t) => lower.includes(t))) {
+    return { isGreeting: false, intent: 'guided_advisor', reply: '' };
+  }
+
+  // ── Deals / Sale / Flash Sale intent ─────────────────────────────────────
+  if (
+    lower.includes('deals') ||
+    lower.includes('flash sale') ||
+    lower.includes('offer') ||
+    lower.includes('discount') ||
+    lower.includes("today's sale") ||
+    lower.includes('best offers') ||
+    lower.includes('sale today') ||
+    lower.includes('on sale')
+  ) {
+    return { isGreeting: false, intent: 'popular_products', reply: '' };
+  }
+
   if (
     lower.includes('add') &&
     (lower.includes('cart') || lower.includes('all to cart'))
@@ -207,19 +230,63 @@ function localFallbackParse(message: string): ParsedIntent {
     return { isGreeting: false, intent: 'add_to_cart', reply: '' };
   }
 
-  // Bundle advisor intent - persona-based recommendations
+  // ── Gaming PC build intent ────────────────────────────────────────────────
+  const gamingBuildTriggers = [
+    'pick a good pc build',
+    'help me to pick a good pc build',
+    'pick pc build',
+    'good pc build',
+    'build gaming pc',
+    'build a gaming pc',
+    'build pc',
+    'build a pc',
+    'gaming rig',
+    'gaming build',
+    'pc build',
+    'pc builder',
+    'build my pc',
+    'build gaming rig',
+    'assemble pc',
+    'help me build',
+    'recommend gaming pc',
+    'gaming computer build',
+    'compatible parts',
+    'what processor',
+    'which gpu',
+    'which cpu',
+  ];
+  if (gamingBuildTriggers.some((t) => lower.includes(t))) {
+    return { isGreeting: false, intent: 'gaming_build', reply: '' };
+  }
+
+  // ── Coupon intent ─────────────────────────────────────────────────────────
+  if (
+    lower.includes('coupon') ||
+    lower.includes('promo code') ||
+    lower.includes('discount code') ||
+    lower.includes('apply code') ||
+    lower.includes('voucher') ||
+    lower.includes('offer code')
+  ) {
+    return {
+      isGreeting: false,
+      intent: 'product_search',
+      category: undefined,
+      reply: '',
+    };
+  }
+
+  // ── Bundle advisor — persona-based (NOT triggered by "gaming" alone) ──────
   const bundleTriggers = [
     'student',
     'college',
     'university',
     'engineering',
-    'gamer',
-    'gaming setup',
-    'gaming',
+    'gaming setup',        // Must include "setup" — not "gaming" alone
+    'gaming workstation',  // specific gaming workspace persona
     'work from home',
     'professional',
     'office setup',
-    'office',
     'content creator',
     'youtuber',
     'vlogger',
@@ -236,7 +303,7 @@ function localFallbackParse(message: string): ParsedIntent {
     'musician',
     'music production',
     'photographer',
-    'photography',
+    'photography setup',   // must be specific to setup
     'freelancer',
     'freelance',
     'remote work',
@@ -248,7 +315,6 @@ function localFallbackParse(message: string): ParsedIntent {
     lower.includes('setup for') ||
     lower.includes('what should i') ||
     lower.includes('suggest for') ||
-    lower.includes('help me pick') ||
     lower.includes('complete setup') ||
     lower.includes('everything i need');
   if (
@@ -257,7 +323,6 @@ function localFallbackParse(message: string): ParsedIntent {
   ) {
     return { isGreeting: false, intent: 'bundle_advisor', reply: '' };
   }
-  // Also catch: "I am a student want to buy good for me"
   if (
     hasBundlePersona &&
     (lower.includes('good') ||
@@ -266,13 +331,10 @@ function localFallbackParse(message: string): ParsedIntent {
   ) {
     return { isGreeting: false, intent: 'bundle_advisor', reply: '' };
   }
-  // Persona alone (e.g. "I am a student", "I'm a gamer") — route to bundle advisor
-  // which will ask follow-up questions about what they need
   if (hasBundlePersona) {
     return { isGreeting: false, intent: 'bundle_advisor', reply: '' };
   }
 
-  // Top rated / best rating intent — "best rated mobiles", "top rating phones", "highest rated laptops"
   const hasRatingIntent =
     lower.includes('best rat') ||
     lower.includes('top rat') ||
@@ -282,7 +344,6 @@ function localFallbackParse(message: string): ParsedIntent {
     lower.includes('most rated') ||
     lower.includes('highly rated');
   if (hasRatingIntent) {
-    // Detect category from the same message
     let ratingCategory: string | undefined;
     if (
       lower.includes('mobile') ||
@@ -317,7 +378,6 @@ function localFallbackParse(message: string): ParsedIntent {
     } as ParsedIntent;
   }
 
-  // Popular/Trending intent — "what's popular", "trending now", "most popular", "bestsellers"
   const hasPopularIntent =
     lower.includes('popular') ||
     lower.includes('trending') ||
@@ -360,6 +420,7 @@ function localFallbackParse(message: string): ParsedIntent {
     return { isGreeting: false, intent: 'address', reply: '' };
   }
 
+  // ── Category / price detection for product_search ─────────────────────────
   let category: string | undefined;
   if (
     lower.includes('mobile') ||
@@ -398,6 +459,23 @@ function localFallbackParse(message: string): ParsedIntent {
     lower.includes('power bank')
   ) {
     category = 'Accessories';
+  } else if (
+    lower.includes(' tv') ||
+    lower.includes('smart tv') ||
+    lower.includes('television') ||
+    lower.includes('qled') ||
+    lower.includes('oled tv') ||
+    lower.includes('4k tv')
+  ) {
+    // TV intent → route to guided advisor for product discovery
+    return { isGreeting: false, intent: 'guided_advisor', reply: '' };
+  } else if (
+    lower.includes('tablet') ||
+    lower.includes('ipad') ||
+    lower.includes('android tablet')
+  ) {
+    // Tablet intent → route to guided advisor for product discovery
+    return { isGreeting: false, intent: 'guided_advisor', reply: '' };
   }
 
   let minPrice: number | undefined;
@@ -499,10 +577,8 @@ function localFallbackParse(message: string): ParsedIntent {
     minPrice = matchAbove[0].includes('k') ? val * 1000 : val;
   }
 
-  // Extract keyword — look for specific product model names in the message
   let keyword: string | undefined;
   const keywordPatterns = [
-    // Match model numbers like "S22", "S24 Ultra", "iPhone 15 Pro", "M2 Pro", "RTX 4090"
     /(?:galaxy\s*)(s\d+[\w\s]*(?:ultra|plus|fe)?)/i,
     /(?:iphone\s*)(\d+[\w\s]*(?:pro|max|plus)?)/i,
     /(?:pixel\s*)(\d+[\w\s]*(?:pro|a)?)/i,
@@ -518,14 +594,12 @@ function localFallbackParse(message: string): ParsedIntent {
     }
   }
 
-  // If no pattern matched, try extracting a product name after intent words
   if (!keyword) {
     const intentMatch = lower.match(
       /(?:show me|find|search|looking for|i want|buy|get me|need)\s+(?:a |an |some |the )?(.+?)(?:\s+under|\s+below|\s+above|\s+from|$)/,
     );
     if (intentMatch) {
       const extracted = intentMatch[1].trim();
-      // Only use as keyword if it's specific enough (not just a generic category)
       const genericTerms = [
         'product',
         'products',
@@ -541,6 +615,9 @@ function localFallbackParse(message: string): ParsedIntent {
         'camera',
         'cameras',
         'accessories',
+        'tv',
+        'tablet',
+        'tablets',
       ];
       if (!genericTerms.includes(extracted) && extracted.length > 2) {
         keyword = extracted;
@@ -584,121 +661,94 @@ async function classifyIntent(
   systemContext: string,
   history?: Array<{ role: string; content: string }>,
 ): Promise<ParsedIntent> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const provider = getAIProvider();
 
-  if (!apiKey) {
-    return localFallbackParse(message);
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-  const models = await getGeminiModels(apiKey);
-
-  // Build conversation context from history
   const historyContext = history?.length
     ? `\nConversation so far:\n${history.map((h) => `${h.role}: ${h.content}`).join('\n')}\n`
     : '';
 
-  for (const model of models) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: `${systemContext}
+  const prompt = `${systemContext}
 ${historyContext}
 User message: "${message}"
 
-Analyze intent: greeting, orders, address, product_search, bundle_advisor, top_picks, popular_products, add_to_cart, or unknown.
+Analyze intent: greeting, orders, address, product_search, bundle_advisor, top_picks, popular_products, add_to_cart, gaming_build, compare, or unknown.
 - For greetings: write a warm personalised welcome using their name if available, mention their interests.
-- For orders: summarise their recent order history.
+- For orders: summarise their recent order history. If user mentions return/refund/exchange, still classify as orders.
 - For address: show/confirm their last shipping address.
 - For add_to_cart: ONLY when user explicitly says "add to cart". NOT when they say "I want to buy X" (that's product_search).
-- For popular_products: when user asks about "what's popular", "trending", "bestsellers", "most reviewed", "what should I buy" in a general sense (not category-specific).
-  Example: "What's popular right now?" → popular_products
-  Example: "Show me trending products" → popular_products
-  Example: "What are bestsellers?" → popular_products
-  Example: "What should I buy?" (generic, no specific category) → popular_products
-- For bundle_advisor: when user mentions a PERSONA (student, gamer, professional, creator, work from home) AND wants recommendations/suggestions/a setup. 
-  Example: "I am a student want to buy good for me" → bundle_advisor
-  Example: "need a gaming setup" → bundle_advisor
-  Example: "I'm a professional, what laptop should I get?" → bundle_advisor
-- For product_search: extract the following:
+- For popular_products: when user asks about "what's popular", "trending", "bestsellers", "most reviewed", "deals", "flash sale", "offers", "on sale" in a general sense.
+- For compare: when user says "compare X vs Y", "X versus Y", "difference between X and Y". Extract both product names.
+- For gaming_build: when user wants to BUILD or ASSEMBLE a gaming PC, mentions "gaming rig", "gaming build", "PC build", "build my PC", asks about compatible parts.
+  Example: "build me a gaming PC for 80k" → gaming_build
+  Example: "I want to assemble a gaming rig" → gaming_build
+  IMPORTANT: "gaming" ALONE does NOT trigger gaming_build. "I want a gaming laptop" → product_search with category=Laptops.
+- For bundle_advisor: when user mentions a PERSONA (student, professional, creator, work from home) AND wants a complete setup/recommendations. NOT for gaming PC builds. NOT for "gaming" alone.
+- For product_search: extract category, maxPrice, minPrice, keyword, brands, sortByPrice, sortByRating.
   * category: one of Mobiles, Laptops, Accessories, Audio, Cameras
+  * TV / Smart TV queries → classify as guided_advisor intent (not product_search)
   * maxPrice: upper price limit in INR (number)
   * minPrice: lower price limit in INR (number)
-  * keyword: THE SPECIFIC product model or name the user is asking about. This is CRITICAL.
+  * keyword: THE SPECIFIC product model or name. CRITICAL.
     - "I want to buy Galaxy S22" → keyword: "Galaxy S22"
-    - "show me iPhone 15 Pro" → keyword: "iPhone 15 Pro"  
-    - "Samsung S24 Ultra" → keyword: "S24 Ultra"
+    - "show me iPhone 15 Pro" → keyword: "iPhone 15 Pro"
     - "MacBook Air M2" → keyword: "MacBook Air M2"
-    - "Sony WH-1000XM5" → keyword: "WH-1000XM5"
-    - "I want to build a gaming PC" → keyword: "gaming"
-    - "show me mobiles" → keyword: null (generic, no specific model)
-    IMPORTANT: If the user mentions a SPECIFIC model name/number, ALWAYS extract it as keyword. 
-    Do NOT leave keyword null when user is asking about a specific product.
-  * brands: array of brand names to filter by (e.g. ["Apple", "Samsung"])
+    - "show me mobiles" → keyword: null (generic)
+  * brands: array of brand names (e.g. ["Apple", "Samsung"])
     - Extract brand from context: "Galaxy S22" → brands: ["Samsung"]
-    - "iPhone" → brands: ["Apple"]
-    - "MacBook" → brands: ["Apple"]
   * sortByPrice: "asc" for cheapest first, "desc" for most expensive first
-  * sortByRating: true when user asks for "best rated", "top rated", "highest rated", "best reviews" products
+  * sortByRating: true when user asks for "best rated", "top rated", "highest rated"
 
-  IMPORTANT clarification rule: if the message only gives a budget (for example, "show me products under 30k", "anything below 30000", or "suggest something affordable") and does not include a category, product keyword, brand, persona, or use case:
-  - classify as product_search
-  - extract minPrice/maxPrice correctly
-  - set category and keyword to null
-  - do not infer a category or interest
+  IMPORTANT clarification rule: if message only gives budget with no category/brand/keyword:
+  - classify as product_search, extract price, set category/keyword null
 
-  IMPORTANT price tier rules for Indian electronics market:
-  - "premium", "flagship", "high-end", "luxury", "top" → set minPrice high (Mobiles: 60000, Laptops: 80000, Audio: 15000, Cameras: 50000), sortByPrice: "desc", brands: top-tier brands
-  - "budget", "cheap", "affordable", "value for money", "economical" → set maxPrice low (Mobiles: 25000, Laptops: 50000, Audio: 5000, Cameras: 30000), sortByPrice: "asc"
-  - "mid-range", "moderate" → set both minPrice and maxPrice (Mobiles: 25000-60000, Laptops: 50000-80000)
-  - If user mentions a specific brand like "Apple", "Samsung", "Sony", "Dell" etc, include it in brands array
-  
+  IMPORTANT price tier rules for Indian market:
+  - "premium", "flagship", "high-end" → set minPrice high, sortByPrice: "desc"
+  - "budget", "cheap", "affordable" → set maxPrice low, sortByPrice: "asc"
+  - "mid-range", "moderate" → set both minPrice and maxPrice
+
 - For unknown: ask a helpful clarifying question.
 
-Always write a natural, friendly conversational reply.`,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              isGreeting: { type: Type.BOOLEAN },
-              intent: { type: Type.STRING },
-              category: { type: Type.STRING, nullable: true },
-              maxPrice: { type: Type.NUMBER, nullable: true },
-              minPrice: { type: Type.NUMBER, nullable: true },
-              keyword: { type: Type.STRING, nullable: true },
-              brands: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                nullable: true,
-              },
-              sortByPrice: {
-                type: Type.STRING,
-                nullable: true,
-                description: '"asc" or "desc"',
-              },
-              sortByRating: {
-                type: Type.BOOLEAN,
-                nullable: true,
-                description: 'true when user wants best/top rated products',
-              },
-              reply: { type: Type.STRING, description: 'Conversational reply' },
-            },
-          },
-        },
-      });
-      return JSON.parse(response.text || '{}');
-    } catch (error) {
-      console.warn(`[RouterAgent] Gemini model ${model} failed:`, error);
-    }
-  }
+Always write a natural, friendly conversational reply.`;
 
-  return localFallbackParse(message);
+  try {
+    const result = await provider.generateStructuredJSON(prompt, INTENT_SCHEMA);
+    return result as unknown as ParsedIntent;
+  } catch (error) {
+    console.warn(
+      '[RouterAgent] AI provider failed, using local fallback:',
+      error,
+    );
+    return localFallbackParse(message, history);
+  }
 }
 
 export class RouterAgent {
   async classifyIntent(ctx: AgentContext): Promise<ParsedIntent> {
     const systemContext = buildSystemContext(ctx.userId, ctx.userContext);
-    return classifyIntent(ctx.message, systemContext, ctx.history);
+
+    // Fast deterministic local intent parse
+    const local = localFallbackParse(ctx.message, ctx.history);
+    if (
+      local.intent === 'guided_advisor' ||
+      local.intent === 'gaming_build' ||
+      local.intent === 'greeting' ||
+      local.intent === 'add_to_cart' ||
+      local.intent === 'orders' ||
+      local.intent === 'address' ||
+      local.intent === 'compare' ||
+      local.intent === 'popular_products'
+    ) {
+      return local;
+    }
+
+    // Call LLM for open-ended product search / complex intent classification
+    const llmParsed = await classifyIntent(ctx.message, systemContext, ctx.history);
+
+    // If local detected guided advisor or gaming build triggers, override LLM
+    if (local.intent === 'guided_advisor' || local.intent === 'gaming_build') {
+      return local;
+    }
+
+    return llmParsed;
   }
 }

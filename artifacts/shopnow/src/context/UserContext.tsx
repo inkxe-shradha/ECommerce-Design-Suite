@@ -11,6 +11,7 @@ import {
   useLogout,
   getGetMeQueryKey,
   getGetCartQueryKey,
+  getGetHomepageRecommendationsQueryKey,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
@@ -158,17 +159,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     await refetch();
     queryClient.invalidateQueries({ queryKey: getGetCartQueryKey() });
+    queryClient.invalidateQueries({
+      queryKey: getGetHomepageRecommendationsQueryKey(),
+    });
   };
 
-  // Reset logout flag when user successfully logs in
+  // Reset logout flag & invalidate recommendations when user successfully logs in
   useEffect(() => {
     if (user && user.id) {
       logoutInProgressRef.current = false;
       wasLoggedInRef.current = true; // Mark that user was logged in
       setSessionExpired(false);
-      console.log('[UserContext] User logged in - logout flag reset');
+      queryClient.invalidateQueries({
+        queryKey: getGetHomepageRecommendationsQueryKey(),
+      });
+      console.log('[UserContext] User logged in - recommendations refreshed');
     }
-  }, [user?.id]);
+  }, [user?.id, queryClient]);
 
   const isLoggedIn = !!user && !!user.id;
   const userName = user?.name || 'Guest';

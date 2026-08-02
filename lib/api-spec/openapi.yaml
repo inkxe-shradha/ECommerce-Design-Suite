@@ -161,6 +161,16 @@ paths:
           in: query
           schema:
             type: string
+        - name: department
+          in: query
+          schema:
+            type: string
+          description: "Filter by department, e.g. Gaming"
+        - name: componentType
+          in: query
+          schema:
+            type: string
+          description: "Filter by component type, e.g. Processor"
         - name: minPrice
           in: query
           schema:
@@ -409,6 +419,82 @@ paths:
               schema:
                 $ref: "#/components/schemas/AIChatResponse"
 
+  /cart/coupon:
+    post:
+      operationId: applyCoupon
+      tags: [cart]
+      summary: Apply or validate a coupon against the current cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [couponCode]
+              properties:
+                couponCode:
+                  type: string
+      responses:
+        "200":
+          description: Updated cart with coupon applied or rejection reason
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+    delete:
+      operationId: removeCoupon
+      tags: [cart]
+      summary: Remove any applied coupon from the cart
+      responses:
+        "200":
+          description: Updated cart without coupon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /coupons/validate:
+    get:
+      operationId: validateCoupon
+      tags: [cart]
+      summary: Validate a coupon code against a cart total and return eligibility info
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: cartTotal
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Coupon validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponValidateResponse"
+
+  /gaming/build:
+    post:
+      operationId: buildGamingPc
+      tags: [gaming]
+      summary: Build a compatible gaming PC recommendation from a brief
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuildBriefInput"
+      responses:
+        "200":
+          description: Compatible gaming PC build result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildResult"
+
 components:
   schemas:
     HealthStatus:
@@ -446,8 +532,19 @@ components:
           type: ["integer", "null"]
         category:
           type: string
+        department:
+          type: ["string", "null"]
+        componentType:
+          type: ["string", "null"]
+        externalId:
+          type: ["string", "null"]
+        sourceUrl:
+          type: ["string", "null"]
         imageUrl:
           type: string
+        images:
+          type: ["string", "null"]
+          description: "JSON array of image URLs"
         rating:
           type: number
         reviewCount:
@@ -458,6 +555,7 @@ components:
           type: ["integer", "null"]
         specs:
           type: ["string", "null"]
+          description: "JSON object of product specifications"
         isFeatured:
           type: boolean
         isDeal:
@@ -563,6 +661,8 @@ components:
             $ref: "#/components/schemas/CartItem"
         subtotal:
           type: number
+        productDiscountAmount:
+          type: number
         discount:
           type: number
         deliveryFee:
@@ -571,6 +671,8 @@ components:
           type: number
         couponApplied:
           type: ["string", "null"]
+        couponInfo:
+          $ref: "#/components/schemas/AppliedCouponInfo"
 
     CartItemInput:
       type: object
@@ -657,6 +759,9 @@ components:
             cardNumber: { type: string }
             expiry: { type: string }
             cvv: { type: string }
+        couponCode:
+          type: string
+          description: "Optional coupon code to apply at checkout"
 
     OrderSuccess:
       type: object
@@ -744,3 +849,115 @@ components:
           type: string
         count:
           type: integer
+        subcategories:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              count: { type: integer }
+
+    AppliedCouponInfo:
+      type: object
+      properties:
+        code:
+          type: string
+        campaignName:
+          type: string
+        discountType:
+          type: string
+          enum: [percent, fixed]
+        discountValue:
+          type: number
+        appliedDiscount:
+          type: number
+        eligibleSubtotal:
+          type: number
+        rejectionReason:
+          type: ["string", "null"]
+
+    CouponValidateResponse:
+      type: object
+      required:
+        - valid
+        - code
+      properties:
+        valid:
+          type: boolean
+        code:
+          type: string
+        couponInfo:
+          $ref: "#/components/schemas/AppliedCouponInfo"
+        message:
+          type: string
+
+    BuildBriefInput:
+      type: object
+      required:
+        - budget
+        - workload
+        - targetDisplay
+      properties:
+        budget:
+          type: integer
+          description: "Total budget in INR"
+        workload:
+          type: string
+          enum: [gaming, streaming, creator, workstation]
+        targetDisplay:
+          type: string
+          enum: [1080p60, 1080p144, 1440p144, 4k60]
+        needsStreaming:
+          type: boolean
+          default: false
+        includePeripherals:
+          type: boolean
+          default: false
+        cpuBrand:
+          type: ["string", "null"]
+          enum: [AMD, Intel, null]
+        gpuBrand:
+          type: ["string", "null"]
+          enum: [AMD, Nvidia, null]
+
+    BuildResultComponent:
+      type: object
+      required:
+        - componentKey
+        - product
+        - reason
+      properties:
+        componentKey:
+          type: string
+        product:
+          $ref: "#/components/schemas/Product"
+        reason:
+          type: string
+
+    BuildResult:
+      type: object
+      required:
+        - isComplete
+        - components
+        - totalPrice
+        - compatibilityErrors
+        - budgetRemaining
+      properties:
+        isComplete:
+          type: boolean
+        partialNote:
+          type: ["string", "null"]
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/BuildResultComponent"
+        totalPrice:
+          type: number
+        estimatedPowerDraw:
+          type: number
+        compatibilityErrors:
+          type: array
+          items:
+            type: string
+        budgetRemaining:
+          type: number
