@@ -1,0 +1,20 @@
+name: Sync to Shradha Repo
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Inkxe repo
+        uses: actions/checkout@v3
+
+      - name: Push to Shradha repo
+        run: |
+          git config user.name "Shradha Suman"
+          git config user.email "[EMAIL_ADDRESS]"
+          git remote add shradha https://x-access-token:${{ secrets.SHRADHA_TOKEN }}@github.com/shradha-praharaj/ecommerce-design-suite.git
+          git push shradha main --force
