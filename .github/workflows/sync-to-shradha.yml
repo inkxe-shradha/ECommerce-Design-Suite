@@ -12,9 +12,13 @@ jobs:
       - name: Checkout Inkxe repo
         uses: actions/checkout@v3
 
+      - name: Validate PAT inside Actions
+        run: |
+          echo "Testing PAT authentication..."
+          curl -H "Authorization: token ${{ secrets.SHRADHA_TOKEN }}" https://api.github.com/user
+
       - name: Push changes to Shradha repo (PR branch)
         run: |
-          curl -H "Authorization: token ${{ secrets.SHRADHA_TOKEN }}" https://api.github.com/user
           git config user.name "GitHub Action"
           git config user.email "actions@github.com"
           git remote add shradha https://x-access-token:${{ secrets.SHRADHA_TOKEN }}@github.com/shradha-praharaj/ecommerce-design-suite.git
