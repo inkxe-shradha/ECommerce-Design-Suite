@@ -5,5 +5,5 @@ export * from './orders';
 export * from './reviews';
 export * from './coupons';
 export * from './coupon-redemptions';
-export * from './memory';
 export * from './conversations';
+export * from './ai-preferences';
