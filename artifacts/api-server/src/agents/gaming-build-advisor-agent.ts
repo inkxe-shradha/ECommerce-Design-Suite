@@ -224,7 +224,17 @@ function isConfirmation(text: string): boolean {
 }
 
 // ─── Build brief from conversation history ────────────────────────────────────
-
+// Marks a request to start a fresh build, e.g. "build a pc for my son".
+// Follow-up answers and tweaks ("show cheaper build") must not match.
+function isBuildInitiation(text: string): boolean {
+  return (
+    /\b(?:build|assemble|configure|make)\b[^.?!]{0,40}\b(?:pc|computer|rig|desktop)\b/i.test(
+      text,
+    ) ||
+    /\b(?:pc build|pc builder|gaming rig)\b/i.test(text) ||
+    /\b(?:suggest|recommend)\b[^.?!]{0,30}\bpc\b/i.test(text)
+  );
+}
 interface PartialBrief {
   budget?: number;
   minimumBudget?: boolean;
@@ -245,45 +255,50 @@ function extractBriefFromHistory(
   history: Array<{ role: string; content: string }>,
   currentMessage: string,
 ): PartialBrief {
-  const userMessages = history
-    .filter((h) => h.role === 'user')
-    .map((h) => h.content);
-  const allUserMessages = [...userMessages, currentMessage];
+  const conversation = [
+    ...history,
+    { role: 'user', content: currentMessage },
+  ];
+
+  // Only consider messages from the latest build request onward so a new build
+  // never inherits an earlier build's answers.
+  let initiationIndex = -1;
+  for (let i = conversation.length - 1; i >= 0; i--) {
+    if (
+      conversation[i].role === 'user' &&
+      isBuildInitiation(conversation[i].content)
+    ) {
+      initiationIndex = i;
+      break;
+    }
+  }
+  const scope =
+    initiationIndex >= 0 ? conversation.slice(initiationIndex) : conversation;
+  const scopedUserMessages = scope
+    .filter((entry) => entry.role === 'user')
+    .map((entry) => entry.content);
 
   const brief: PartialBrief = {};
 
-  const isNewBuildInitiation =
-    /help me (to )?(pick|build|choose|select)|build me a (pc|gaming)|suggest a (pc|gaming)|want to build a pc|recommend a (pc|gaming)/i.test(
-      currentMessage,
-    );
-
-  // Extract budget: if initiating a new build, require budget to be present in current message
-  if (!isNewBuildInitiation) {
-    for (let i = allUserMessages.length - 1; i >= 0; i--) {
-      const budget = extractBudget(allUserMessages[i]);
-      if (budget) {
-        brief.budget = budget;
-        break;
-      }
+  for (let i = scopedUserMessages.length - 1; i >= 0; i--) {
+    const budget = extractBudget(scopedUserMessages[i]);
+    if (budget) {
+      brief.budget = budget;
+      break;
     }
-    // Fallback: scan assistant messages in history for any previously stated budget (e.g. "for your ₹1,00,000 custom PC build")
-    if (!brief.budget) {
-      for (let i = history.length - 1; i >= 0; i--) {
-        if (history[i].role === 'assistant') {
-          const match = history[i].content.match(/₹([\d,]+)/);
-          if (match) {
-            const parsed = parseInt(match[1].replace(/,/g, ''), 10);
-            if (parsed >= 20000) {
-              brief.budget = parsed;
-              break;
-            }
-          }
+  }
+  if (!brief.budget) {
+    for (let i = scope.length - 1; i >= 0; i--) {
+      if (scope[i].role !== 'assistant') continue;
+      const match = scope[i].content.match(/₹([\d,]+)/);
+      if (match) {
+        const parsed = parseInt(match[1].replace(/,/g, ''), 10);
+        if (parsed >= 20000) {
+          brief.budget = parsed;
+          break;
         }
       }
     }
-  } else {
-    const budget = extractBudget(currentMessage);
-    if (budget) brief.budget = budget;
   }
 
   // Handle budget modifiers in latest message
@@ -310,7 +325,7 @@ function extractBriefFromHistory(
   // Context-gated CPU/GPU preference extraction.
   // We pair each user reply with the assistant question that preceded it to avoid
   // extracting CPU brand from a GPU chip label and vice versa.
-  const allMessages = history; // includes both roles
+  const allMessages = scope; // includes both roles, scoped to the current build
   for (let i = allMessages.length - 1; i >= 0; i--) {
     if (allMessages[i].role !== 'user') continue;
     const userReply = allMessages[i].content;
@@ -345,7 +360,7 @@ function extractBriefFromHistory(
   }
 
   // Also check the current message if it was answering the most recent assistant question
-  const lastAssistant = [...history]
+  const lastAssistant = [...scope]
     .reverse()
     .find((m) => m.role === 'assistant');
   const lastAsstQ = (lastAssistant?.content || '').toLowerCase();
@@ -371,8 +386,8 @@ function extractBriefFromHistory(
   }
 
   // Extract workload from user messages
-  for (let i = allUserMessages.length - 1; i >= 0; i--) {
-    const w = extractWorkload(allUserMessages[i]);
+  for (let i = scopedUserMessages.length - 1; i >= 0; i--) {
+    const w = extractWorkload(scopedUserMessages[i]);
     if (w) {
       brief.workload = w;
       break;
@@ -380,8 +395,8 @@ function extractBriefFromHistory(
   }
 
   // Understand the recipient's time commitment before asking about components.
-  const allUserText = allUserMessages.join(' ').toLowerCase();
-  brief.minimumBudget = allUserMessages.some(hasMinimumBudgetRequest);
+  const allUserText = scopedUserMessages.join(' ').toLowerCase();
+  brief.minimumBudget = scopedUserMessages.some(hasMinimumBudgetRequest);
   brief.premiumPreference =
     /\b(premium|flagship|high[- ]end|top[- ]tier|more expensive|higher[- ]end)\b/.test(
       allUserText,
@@ -400,9 +415,10 @@ function extractBriefFromHistory(
   }
 
   // Extract display target from user messages (only if display/resolution was asked or explicit resolution specified)
-  for (let i = allUserMessages.length - 1; i >= 0; i--) {
-    const msg = allUserMessages[i];
-    const precedingAssistant = [...allMessages.slice(0, i)]
+  for (let i = scope.length - 1; i >= 0; i--) {
+    if (scope[i].role !== 'user') continue;
+    const msg = scope[i].content;
+    const precedingAssistant = [...scope.slice(0, i)]
       .reverse()
       .find((m) => m.role === 'assistant');
     const assistantQ = (precedingAssistant?.content || '').toLowerCase();
@@ -455,7 +471,7 @@ function extractBriefFromHistory(
     }
   }
 
-  if (/stream|broadcast/i.test(allUserMessages.join(' '))) {
+  if (/stream|broadcast/i.test(scopedUserMessages.join(' '))) {
     brief.needsStreaming = true;
   }
 
