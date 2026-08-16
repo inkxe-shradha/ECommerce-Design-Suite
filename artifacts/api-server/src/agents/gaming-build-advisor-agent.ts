@@ -674,14 +674,77 @@ export class GamingBuildAdvisorAgent implements Agent {
       return this.confirmAndAddToCart(ctx, history);
     }
 
+    // ── Handle resume from leftout session ─────────────────────────────────
+    if (
+      lowerMsg.includes('continue where i left off') ||
+      lowerMsg.includes('continue my pc build') ||
+      lowerMsg.includes('review build components')
+    ) {
+      const inc = ctx.userContext?.incompleteCheckpoint;
+      if (inc && inc.budgetMax && !brief.budget) {
+        brief.budget = Number(inc.budgetMax);
+      }
+      if (inc && inc.answers) {
+        if (inc.answers.workload) brief.workload = inc.answers.workload as any;
+        if (inc.answers.cpuBrand) brief.cpuBrand = inc.answers.cpuBrand as any;
+        if (inc.answers.gpuBrand) brief.gpuBrand = inc.answers.gpuBrand as any;
+      }
+    }
+
+    // ── Detect recipient context (asking for self vs gift/other) ───────────
+    const isOtherRecipient =
+      /\b(for my|for a friend|for my friend|for my brother|for my sister|for my wife|for my husband|for my kid|for my son|for my daughter|gift for)\b/i.test(
+        message,
+      );
+
+    const userProfile = ctx.userContext?.preferenceProfile;
+    const isKnownGamer =
+      !isOtherRecipient &&
+      (userProfile?.personaHint === 'gamer' ||
+        userProfile?.useCases?.includes('gaming') ||
+        ctx.userContext?.interests?.includes('Gaming'));
+
+    // If user is a known gamer building for themselves, prefill workload and skip processor prompt
+    if (isKnownGamer) {
+      brief.workload = brief.workload || 'gaming';
+      brief.usageIntensity = brief.usageIntensity || 'heavy';
+
+      // If budget is still missing, directly ask for budget without asking CPU/workload
+      if (!brief.budget) {
+        const userName = ctx.userContext?.name ? `${ctx.userContext.name}` : '';
+        const greetingPrefix = userName ? `Awesome, ${userName}! 🎮` : `Awesome! 🎮`;
+        return {
+          reply:
+            `${greetingPrefix} Since you're building a dedicated gaming rig, what is your target budget for this setup (e.g. ₹60,000, ₹80,000, ₹1,00,000, ₹1,50,000+)?\n\n` +
+            `Once you specify your budget, I will automatically calculate the best performance gaming build for your preference with maximum FPS and optimal component synergy!`,
+          products: [],
+          orders: [],
+          followUp: [
+            '₹60,000 budget',
+            '₹80,000 budget',
+            '₹1,00,000 budget',
+            '₹1,50,000 budget',
+          ],
+          userContext: ctx.userContext
+            ? {
+                name: ctx.userContext.name,
+                recentOrderCount: ctx.userContext.recentOrders?.length ?? 0,
+                interests: ctx.userContext.interests,
+              }
+            : null,
+        };
+      }
+    }
+
     // ── STEP 2: ADAPTIVE FLOW BASED ON EXPERTISE ───────────────────────────
     const nextField = getNextFieldForExpertise(expertise.level, brief);
     const skipFields = nextField.skipFields ?? [];
 
     // Skip "workload" and "usageIntensity" for experts; they're focused on components
-    if (expertise.level === 'expert' && !brief.cpuPreference) {
+    if (expertise.level === 'expert' && !brief.cpuPreference && !isKnownGamer) {
       return this.askQuestion(nextField.question, ctx, nextField.followUp);
     }
+
 
     if (expertise.level === 'expert' && !brief.gpuPreference) {
       return this.askQuestion(nextField.question, ctx, nextField.followUp);
